@@ -9,46 +9,40 @@ Sub Docx2Txt()
     ' 2. 本文档含有 body 基础样式用于格式化文档，请勿删除，如丢失可基于正文样式添加一个名为 body 的样式
     ' 3. 把待处理的文件内容粘贴至本文档，粘贴选项选择“合并格式”
     ' 4. 如文档中含有图片，将在本文档同目录中生成 .emf 中间格式图片文件，为避免混乱，可将本文档放置于新建的空白文件夹中
+    ' 5. 事先下载安装 ImageMagick，用于导入图片文件的转换：http://imagemagick.org/script/download.php#windows
     
-    ' 基本样式全文置为 body 样式
-    PreprocessDocumentFormat
+    Application.ScreenUpdating = False
     
-    ' 必要的格式转为 HTML 标签
     ConvertSuperscriptToHtml ' 上标
     ConvertSubscriptToHtml   ' 下标
     
-    ' 选项中项目编号转为文本
-    ' 注意：这个要先于题干或解析里的项目编号处理掉
-    ConvertListsInOptionsToText
+    ConvertListsInOptionsToText           ' 选项中项目编号转为文本
+    ConvertQuestionNoListParagraphsToText ' 题号的项目编号转文本
     
     ' 题干和答案中的列表转为 ol,ul 等 HTML 标签
     ' 目前只支持一级列表，嵌套列表后续完善
     ConvertListsInBodyToHtml
+    
+    ' 基本样式全文置为 body 样式
+    PreprocessDocumentFormat
     
     ' 表格转为 HTML 标签
     ' 目前只支持普通表格和有横向单元格合并的表格
     ' 后续完善有纵向单元格合并的表格
     ConvertTablesToHtml
     
-    ' 导出文档中所有的图片
-    ' 导出 emf 格式文件，再转为 jpg
-    SaveImagesToDiskFiles
+    SaveImagesToDiskFiles ' 导出文档中所有的图片
+    ConvertEmfToJpg       ' emf 转 jpg，同时删除 emf 文件
     
-    ' 处理题干
-    ProcessQuestionBody
-    
-    ' 处理选项
-    ProcessQuestionOption
-    
-    ' 处理答案
-    ProcessAnswer
-    
-    ' 处理题目属性字段
-    ' 把分类、题号、题型等题目字段转成待导入的格式
-    PrepareQuestionAttr
+    ProcessQuestionBody   ' 处理题干
+    ProcessQuestionOption ' 处理选项
+    ProcessAnswer         ' 处理答案
+    PrepareQuestionAttr   ' 处理题目属性字段，把分类、题号、题型等题目字段转成待导入的格式
     
     ' 最后把关，处理遗留格式
     PostprocessDocumentFormat
+
+    Application.ScreenUpdating = True
 
     ' 另存为 txt
     'SaveMeToTxt
@@ -60,8 +54,8 @@ Private Sub PreprocessDocumentFormat()
         .ClearFormatting
         .Execute FindText:="^l", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=False, Replace:=wdReplaceAll
         .Execute FindText:="^13{2,}", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
-        .Execute FindText:="^13[ 　^9]{1,}", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
-        .Execute FindText:="[ 　^9]{1,}^13", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
+        .Execute FindText:="^13[  ^9]{1,}", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
+        .Execute FindText:="[  ^9]{1,}^13", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
     End With
 End Sub
 
@@ -69,6 +63,13 @@ Private Sub PostprocessDocumentFormat()
     ' 最后处理一下遗留格式
     ActiveDocument.Select
     Selection.Style = "body"
+    
+    With ActiveDocument.Content.Find
+        .ClearFormatting
+        .Execute FindText:="</p>^p<", ReplaceWith:="</p><", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="<p><table", ReplaceWith:="<table", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="</table></p>", ReplaceWith:="</table>", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+    End With
 End Sub
 
 Private Sub PrepareQuestionAttr()
@@ -215,6 +216,17 @@ Private Sub ConvertListsInOptionsToText()
     End With
 End Sub
 
+Private Sub ConvertQuestionNoListParagraphsToText()
+    ' 题号的项目编号转文本
+    Dim oPara As Paragraph
+    
+    For Each oPara In ActiveDocument.listParagraphs
+        If StartsWith(oPara.Range.ListFormat.ListString, "【题号】") = True Then
+            oPara.Range.ListFormat.ConvertNumbersToText
+        End If
+    Next oPara
+End Sub
+
 Private Sub ConvertListsInBodyToHtml()
     ' 题干、答案或解析中项目编号转成 HTML
     Dim oList As List
@@ -280,17 +292,17 @@ Private Sub ProcessQuestionBody()
         .Execute FindText:="【题干】", ReplaceWith:="【题干】^p", Forward:=True, Format:=False, Replace:=wdReplaceAll, MatchWildcards:=False
     End With
     
-    ' 遍历【题干】和【选项】之间的部分
+    ' 遍历【题干】和【 之间的部分
     Set oRange = doc.Range
     With oRange.Find
         .ClearFormatting
         .Replacement.ClearFormatting
-        .Execute FindText:="【题干】*【选项】", Forward:=True, Format:=False, MatchWildcards:=True
+        .Execute FindText:="【题干】*【", Forward:=True, Format:=False, MatchWildcards:=True
         
         Do While .Found = True
             oRange.MoveStart Unit:=wdCharacter, Count:=5
-            oRange.MoveEnd Unit:=wdCharacter, Count:=-4
-            Debug.Print oRange.Text
+            oRange.MoveEnd Unit:=wdCharacter, Count:=-1
+            'Debug.Print oRange.Text
             oRange.Select
             
             strBody = ""
@@ -300,7 +312,7 @@ Private Sub ProcessQuestionBody()
                 strPara = Replace(strPara, vbCr, "")
                 strBody = strBody & "<p>" & strPara & "</p>"
             Next oPara
-            Debug.Print strBody
+            'Debug.Print strBody
             
             Selection.Cut
             Selection.InsertBefore strBody & vbCrLf
@@ -340,17 +352,17 @@ Private Sub ProcessAnswer()
         .Execute FindText:="^13{2,}", ReplaceWith:="^p", Forward:=True, Format:=False, Replace:=wdReplaceAll, MatchWildcards:=True
     End With
     
-    ' 遍历【答案】和【难度】之间的部分
+    ' 遍历【答案】和【 之间的部分
     Set oRange = doc.Range
     With oRange.Find
         .ClearFormatting
         .Replacement.ClearFormatting
-        .Execute FindText:="【答案】*【难度】", Forward:=True, Format:=False, MatchWildcards:=True
+        .Execute FindText:="【答案】*【", Forward:=True, Format:=False, MatchWildcards:=True
         
         Do While .Found = True
             oRange.MoveStart Unit:=wdCharacter, Count:=5
-            oRange.MoveEnd Unit:=wdCharacter, Count:=-4
-            Debug.Print oRange.Text
+            oRange.MoveEnd Unit:=wdCharacter, Count:=-1
+            'Debug.Print oRange.Text
             oRange.Select
             
             strBody = ""
@@ -360,7 +372,7 @@ Private Sub ProcessAnswer()
                 strPara = Replace(strPara, vbCr, "")
                 strBody = strBody & "<p>" & strPara & "</p>"
             Next oPara
-            Debug.Print strBody
+            'Debug.Print strBody
             
             Selection.Cut
             Selection.InsertBefore strBody & vbCrLf
@@ -410,14 +422,14 @@ Private Sub ProcessQuestionOption()
             strOptionAnswer = Mid(oRange.Text, InStr(1, oRange.Text, "【答案】") + 4)
             strOptionAnswer = Replace(strOptionAnswer, vbCrLf, "")
             strOptionAnswer = Replace(strOptionAnswer, vbCr, "")
-            Debug.Print strOptionAnswer
+            'Debug.Print strOptionAnswer
             
             ' 添加正确选项的标记
             For i = 1 To Len(strOptionAnswer)
                 strOptions = Replace(strOptions, Mid(strOptionAnswer, i, 1) & "#", Mid(strOptionAnswer, i, 1) & "#T#")
             Next
             
-            Debug.Print strOptions
+            'Debug.Print strOptions
             
             ' 替换到文档中
             oRange.Cut
@@ -557,8 +569,30 @@ Private Sub SaveImagesToDiskFiles()
         
         ' 替换文件的图片
         Selection.Cut
-        Selection.InsertBefore "[img]" & strPictureFileName & ".emf[/img]"
+        Selection.InsertBefore "[img]" & strPictureFileName & ".jpg[/img]"
     Next i
+End Sub
+
+Private Sub ConvertEmfToJpg()
+    ' 把生成的 emf 转成 jpg
+    Dim imgFileName As String
+    Dim newFileName As String
+    Dim strCmd As String
+    
+    ChDrive Left(ActiveDocument.Path, 1)
+    ChDir ActiveDocument.Path
+    
+    imgFileName = Dir("*.emf")
+    Do While imgFileName <> ""
+        newFileName = Replace(imgFileName, ".emf", ".jpg")
+        ' cmd /S /C magick 201809171713_01.emf 201809171713_01.jpg && del 201809171713_01.emf
+        strCmd = "cmd /S /C magick " & imgFileName & " " & newFileName & " && del " & imgFileName
+        Debug.Print strCmd
+        Call Shell(strCmd, vbHide)
+        
+        imgFileName = Dir()
+    Loop
+    
 End Sub
 
 Private Sub SaveMeToTxt()
@@ -601,3 +635,16 @@ Private Function StartsWith(str As String, start As String) As Boolean
      startLen = Len(start)
      StartsWith = (Left(Trim(UCase(str)), startLen) = UCase(start))
 End Function
+
+Private Function FileExists(ByVal FileToTest As String) As Boolean
+   FileExists = (Dir(FileToTest) <> "")
+End Function
+
+Private Sub DeleteFile(ByVal FileToDelete As String)
+   If FileExists(FileToDelete) Then 'See above
+      ' First remove readonly attribute, if set
+      SetAttr FileToDelete, vbNormal
+      ' Then delete the file
+      Kill FileToDelete
+   End If
+End Sub
