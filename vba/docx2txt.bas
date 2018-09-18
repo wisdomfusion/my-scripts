@@ -14,8 +14,8 @@ Sub Docx2Txt()
     PreprocessDocumentFormat
     
     ' 必要的格式转为 HTML 标签
-    ConvertSuperscriptToHtml
-    ConvertSubscriptToHtml
+    ConvertSuperscriptToHtml ' 上标
+    ConvertSubscriptToHtml   ' 下标
     
     ' 选项中项目编号转为文本
     ' 注意：这个要先于题干或解析里的项目编号处理掉
@@ -34,25 +34,41 @@ Sub Docx2Txt()
     ' 导出 emf 格式文件，再转为 jpg
     SaveImagesToDiskFiles
     
+    ' 处理题干
+    ProcessQuestionBody
+    
+    ' 处理选项
+    ProcessQuestionOption
+    
+    ' 处理答案
+    ProcessAnswer
+    
     ' 处理题目属性字段
     ' 把分类、题号、题型等题目字段转成待导入的格式
     PrepareQuestionAttr
+    
+    ' 最后把关，处理遗留格式
+    PostprocessDocumentFormat
 
     ' 另存为 txt
-    SaveMeToTxt
+    'SaveMeToTxt
 End Sub
 
 Private Sub PreprocessDocumentFormat()
     ' 预处理格式
-    ActiveDocument.Select
-    
-    With Selection.Find
+    With ActiveDocument.Content.Find
         .ClearFormatting
         .Execute FindText:="^l", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=False, Replace:=wdReplaceAll
         .Execute FindText:="^13{2,}", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
         .Execute FindText:="^13[ 　^9]{1,}", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
         .Execute FindText:="[ 　^9]{1,}^13", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
     End With
+End Sub
+
+Private Sub PostprocessDocumentFormat()
+    ' 最后处理一下遗留格式
+    ActiveDocument.Select
+    Selection.Style = "body"
 End Sub
 
 Private Sub PrepareQuestionAttr()
@@ -206,7 +222,7 @@ Private Sub ConvertListsInBodyToHtml()
     
     For Each oList In ActiveDocument.Lists
         With oList.Range
-            .MoveStart unit:=wdCharacter, Count:=-1
+            .MoveStart Unit:=wdCharacter, Count:=-1
             .Select
         End With
         
@@ -248,32 +264,126 @@ Private Sub ConvertListsInBodyToHtml()
 End Sub
 
 Private Sub ProcessQuestionBody()
+    ' 处理题干
+    Dim doc As Document
     Dim oRange As Range
     Dim oPara As Paragraph
+    Dim strBody As String
+    Dim strPara As String
     
-    With ActiveDocument.Content.Find
+    Set doc = ActiveDocument
+    
+    ' 【题干】 独立成行
+    With doc.Content.Find
         .ClearFormatting
         .Replacement.ClearFormatting
         .Execute FindText:="【题干】", ReplaceWith:="【题干】^p", Forward:=True, Format:=False, Replace:=wdReplaceAll, MatchWildcards:=False
     End With
     
-    Set oRange = ActiveDocument.Range
+    ' 遍历【题干】和【选项】之间的部分
+    Set oRange = doc.Range
     With oRange.Find
         .ClearFormatting
         .Replacement.ClearFormatting
         .Execute FindText:="【题干】*【选项】", Forward:=True, Format:=False, MatchWildcards:=True
         
         Do While .Found = True
-            For Each oPara In oRange.Paragraphs
-                oPara.Range.Text = "<p>" & oPara.Range.Text & "</p>"
+            oRange.MoveStart Unit:=wdCharacter, Count:=5
+            oRange.MoveEnd Unit:=wdCharacter, Count:=-4
+            Debug.Print oRange.Text
+            oRange.Select
+            
+            strBody = ""
+            For Each oPara In Selection.Range.Paragraphs
+                strPara = oPara.Range.Text
+                strPara = Replace(strPara, vbCrLf, "")
+                strPara = Replace(strPara, vbCr, "")
+                strBody = strBody & "<p>" & strPara & "</p>"
             Next oPara
+            Debug.Print strBody
+            
+            Selection.Cut
+            Selection.InsertBefore strBody & vbCrLf
             
             .Execute
         Loop
     End With
+    
+    ' 剔除多余的 <p></p> 标签
+    With doc.Content.Find
+        .ClearFormatting
+        .Replacement.ClearFormatting
+        .Execute FindText:="<p><ol", ReplaceWith:="<ol", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="</ol></p>", ReplaceWith:="</ol>", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="<p><ul>", ReplaceWith:="<ul>", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="</ul></p>", ReplaceWith:="</ul>", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="【题干】^p", ReplaceWith:="=body#", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+    End With
+End Sub
+
+Private Sub ProcessAnswer()
+    ' 处理主题观的答案
+    
+    Dim doc As Document
+    Dim oRange As Range
+    Dim oPara As Paragraph
+    Dim strBody As String
+    Dim strPara As String
+    
+    Set doc = ActiveDocument
+    
+    ' 【答案】 独立成行
+    With doc.Content.Find
+        .ClearFormatting
+        .Replacement.ClearFormatting
+        .Execute FindText:="【答案】", ReplaceWith:="【答案】^p", Forward:=True, Format:=False, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="^13{2,}", ReplaceWith:="^p", Forward:=True, Format:=False, Replace:=wdReplaceAll, MatchWildcards:=True
+    End With
+    
+    ' 遍历【答案】和【难度】之间的部分
+    Set oRange = doc.Range
+    With oRange.Find
+        .ClearFormatting
+        .Replacement.ClearFormatting
+        .Execute FindText:="【答案】*【难度】", Forward:=True, Format:=False, MatchWildcards:=True
+        
+        Do While .Found = True
+            oRange.MoveStart Unit:=wdCharacter, Count:=5
+            oRange.MoveEnd Unit:=wdCharacter, Count:=-4
+            Debug.Print oRange.Text
+            oRange.Select
+            
+            strBody = ""
+            For Each oPara In Selection.Range.Paragraphs
+                strPara = oPara.Range.Text
+                strPara = Replace(strPara, vbCrLf, "")
+                strPara = Replace(strPara, vbCr, "")
+                strBody = strBody & "<p>" & strPara & "</p>"
+            Next oPara
+            Debug.Print strBody
+            
+            Selection.Cut
+            Selection.InsertBefore strBody & vbCrLf
+            
+            .Execute
+        Loop
+    End With
+    
+    ' 剔除多余的 <p></p> 标签
+    With doc.Content.Find
+        .ClearFormatting
+        .Replacement.ClearFormatting
+        .Execute FindText:="<p><ol", ReplaceWith:="<ol", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="</ol></p>", ReplaceWith:="</ol>", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="<p><ul>", ReplaceWith:="<ul>", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="</ul></p>", ReplaceWith:="</ul>", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+        .Execute FindText:="【答案】^p", ReplaceWith:="=answer#", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
+    End With
 End Sub
 
 Private Sub ProcessQuestionOption()
+    ' 处理选项
+    
     Dim oRange As Range
     Dim i As Integer
     Dim strOptions As String
