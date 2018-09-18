@@ -3,12 +3,12 @@ Option Explicit
 Option Base 1
 
 Sub Docx2Txt()
-    ' 我的自白：
-    ' 1. 我是启用宏的 Word 文档，请在初次打开我时启用宏
-    ' 2. 我打开的是 docx，吐出的是 jpg 和 txt，txt 编码 UTF-8-BOM Unix(LF)
-    ' 3. 让我处理文档前，先下载安装 ImageMagick，用于导入图片文件的转换：http://imagemagick.org/script/download.php#windows
-    ' 4. 为避免文件混乱，请把我放在一个干干净净的文件夹中
-    ' 5. 我不完美，需要反馈和 bugfix
+' 我的自白：
+' 1. 我是启用宏的 Word 文档，请在初次打开我时启用宏
+' 2. 我打开的是 docx，吐出的是 jpg 和 txt，txt 编码 UTF-8-BOM Unix(LF)
+' 3. 让我处理文档前，先下载安装 ImageMagick，用于导入图片文件的转换：http://imagemagick.org/script/download.php#windows
+' 4. 为避免文件混乱，请把我放在一个干干净净的文件夹中
+' 5. 我不完美，需要反馈和 bugfix
     
     Dim strMainPath As String
     Dim strNewPath As String
@@ -36,14 +36,17 @@ Sub Docx2Txt()
     docToProcess.SaveAs2 FileName:=strNewPath
     
     ' =========================== START ==========================
+    ' 以下处理，顺序很重要的！
     
     Application.ScreenUpdating = False
     
     ConvertSuperscriptToHtml docToProcess ' 上标
-    ConvertSubscriptToHtml docToProcess  ' 下标
+    ConvertSubscriptToHtml docToProcess   ' 下标
     
-    ConvertListsInOptionsToText docToProcess          ' 选项中项目编号转为文本
-    ConvertQuestionNoListParagraphsToText docToProcess ' 题号的项目编号转文本
+    ' 选项中项目编号转为文本
+    ConvertListsInOptionsToText docToProcess
+    ' 题号的项目编号转文本
+    ConvertQuestionNoListParagraphsToText docToProcess
     
     ' 题干和答案中的列表转为 ol,ul 等 HTML 标签
     ' 目前只支持一级列表，嵌套列表后续完善
@@ -57,8 +60,10 @@ Sub Docx2Txt()
     ' 后续完善有纵向单元格合并的表格
     ConvertTablesToHtml docToProcess
     
-    SaveImagesToDiskFiles docToProcess ' 导出文档中所有的图片
-    ConvertEmfToJpg docToProcess       ' emf 转 jpg，同时删除 emf 文件
+    ' 导出文档中所有的图片
+    SaveImagesToDiskFiles docToProcess
+    ' emf 转 jpg，同时删除 emf 文件
+    ConvertEmfToJpg docToProcess
     
     ProcessQuestionBody docToProcess   ' 处理题干
     ProcessQuestionOption docToProcess ' 处理选项
@@ -82,7 +87,8 @@ ErrorHandle:
 End Sub
 
 Private Sub PreprocessDocumentFormat(docToProcess As Document)
-    ' 预处理格式
+' 预处理格式
+
     With docToProcess.Content.Find
         .ClearFormatting
         .Execute FindText:="^l", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=False, Replace:=wdReplaceAll
@@ -93,7 +99,8 @@ Private Sub PreprocessDocumentFormat(docToProcess As Document)
 End Sub
 
 Private Sub PostprocessDocumentFormat(docToProcess As Document)
-    ' 最后处理一下遗留格式
+' 最后处理一下遗留格式
+
     docToProcess.Range.Select
     
     If StyleExists("正文", docToProcess) = True Then
@@ -111,7 +118,7 @@ Private Sub PostprocessDocumentFormat(docToProcess As Document)
 End Sub
 
 Private Sub PrepareQuestionAttr(docToProcess As Document)
-    ' 处理题目字段
+' 处理题目字段
     
     With docToProcess.Content.Find
         .ClearFormatting
@@ -132,7 +139,8 @@ Private Sub PrepareQuestionAttr(docToProcess As Document)
 End Sub
 
 Private Sub ConvertTablesToHtml(docToProcess As Document)
-    ' 把表格转为 HTML 代码
+' 把表格转为 HTML 代码前的预处理
+
     Dim oTable As Table
     Dim i As Integer
     
@@ -153,6 +161,8 @@ Private Sub ConvertTablesToHtml(docToProcess As Document)
 End Sub
 
 Private Sub IterateTables(docToProcess As Document)
+' 把表格转为 HTML
+
     Dim i As Integer ' 表格索引
     Dim j As Integer ' 表格中的单元格索引
     Dim k As Integer ' 遍历结果行二维数组
@@ -233,8 +243,9 @@ Private Sub IterateTables(docToProcess As Document)
 End Sub
 
 Private Sub ConvertListsInOptionsToText(docToProcess As Document)
-    ' 选项中的项目编号转成文字
-    ' 先把选项中的项目编号处理掉，再用 ConvertListsInQuestionBodyToHtml 处理题干中的项目编号
+' 选项中的项目编号转成文字
+' 先把选项中的项目编号处理掉，再用 ConvertListsInQuestionBodyToHtml 处理题干中的项目编号
+
     Dim oPara As Paragraph
     
     With docToProcess.Content.Find
@@ -253,7 +264,8 @@ Private Sub ConvertListsInOptionsToText(docToProcess As Document)
 End Sub
 
 Private Sub ConvertQuestionNoListParagraphsToText(docToProcess As Document)
-    ' 题号的项目编号转文本
+' 题号的项目编号转文本
+
     Dim oPara As Paragraph
     
     For Each oPara In docToProcess.listParagraphs
@@ -264,7 +276,8 @@ Private Sub ConvertQuestionNoListParagraphsToText(docToProcess As Document)
 End Sub
 
 Private Sub ConvertListsInBodyToHtml(docToProcess As Document)
-    ' 题干、答案或解析中项目编号转成 HTML
+' 题干、答案或解析中项目编号转成 HTML
+
     Dim oList As List
     Dim oPara As Paragraph
     
@@ -319,7 +332,7 @@ Private Sub ConvertListsInBodyToHtml(docToProcess As Document)
 End Sub
 
 Private Sub ProcessQuestionBody(docToProcess As Document)
-    ' 处理题干
+' 处理题干
     
     Dim oRange As Range
     Dim oPara As Paragraph
@@ -375,7 +388,7 @@ Private Sub ProcessQuestionBody(docToProcess As Document)
 End Sub
 
 Private Sub ProcessAnswer(docToProcess As Document)
-    ' 处理主题观的答案
+' 处理主题观的答案
     
     Dim oRange As Range
     Dim oPara As Paragraph
@@ -432,7 +445,7 @@ Private Sub ProcessAnswer(docToProcess As Document)
 End Sub
 
 Private Sub ProcessQuestionOption(docToProcess As Document)
-    ' 处理选项
+' 处理选项
     
     Dim oRange As Range
     Dim i As Integer
@@ -490,7 +503,7 @@ Private Sub ProcessQuestionOption(docToProcess As Document)
 End Sub
 
 Private Sub ConvertSuperscriptToHtml(docToProcess As Document)
-    ' 把上标转为 <sup></sup>
+' 把上标转为 <sup></sup>
 
     docToProcess.Select
    
@@ -533,7 +546,7 @@ Private Sub ConvertSuperscriptToHtml(docToProcess As Document)
 End Sub
 
 Private Sub ConvertSubscriptToHtml(docToProcess As Document)
-    ' 把下标转为 <sub></sub>
+' 把下标转为 <sub></sub>
 
     docToProcess.Select
    
@@ -576,8 +589,8 @@ Private Sub ConvertSubscriptToHtml(docToProcess As Document)
 End Sub
 
 Private Sub SaveImagesToDiskFiles(docToProcess As Document)
-    ' 把图片另存为文件
-    ' 并把文本图片替换为形如 [img]201809121523_001.jpg[/img] 的 BBCode 形式
+' 把图片另存为文件
+' 并把文本图片替换为形如 [img]201809121523_001.jpg[/img] 的 BBCode 形式
 
     Dim objShape As InlineShape
     Dim byteData() As Byte
@@ -611,7 +624,8 @@ Private Sub SaveImagesToDiskFiles(docToProcess As Document)
 End Sub
 
 Private Sub ConvertEmfToJpg(docToProcess As Document)
-    ' 把生成的 emf 转成 jpg
+' 把生成的 emf 转成 jpg
+
     Dim imgFileName As String
     Dim newFileName As String
     Dim strCmd As String
@@ -633,7 +647,7 @@ Private Sub ConvertEmfToJpg(docToProcess As Document)
 End Sub
 
 Private Sub SaveMeToTxt(docToProcess As Document)
-    ' 保存成文本文件
+' 保存成文本文件
     
     Dim strFilePath As String
     strFilePath = docToProcess.Path & Application.PathSeparator & docToProcess.Name
@@ -649,7 +663,8 @@ Private Sub SaveMeToTxt(docToProcess As Document)
 End Sub
 
 Private Function PadNumber(intNumber As Integer, intLength As Integer) As String
-    ' 数字前缀 0
+' 数字前缀 0
+
     Dim strZeros As String
     Dim i As Integer
     For i = 1 To intLength
@@ -660,24 +675,24 @@ Private Function PadNumber(intNumber As Integer, intLength As Integer) As String
 End Function
 
 Private Function EndsWith(str As String, ending As String) As Boolean
-    ' 字符串是否以某字符串为结尾
+' 字符串是否以某字符串为结尾
+
      Dim endingLen As Integer
      endingLen = Len(ending)
      EndsWith = (Right(Trim(UCase(str)), endingLen) = UCase(ending))
 End Function
 
 Private Function StartsWith(str As String, start As String) As Boolean
-    ' 字符串是否以某字符串为开头
+' 字符串是否以某字符串为开头
+
      Dim startLen As Integer
      startLen = Len(start)
      StartsWith = (Left(Trim(UCase(str)), startLen) = UCase(start))
 End Function
 
-Private Function FileExists(ByVal FileToTest As String) As Boolean
-   FileExists = (Dir(FileToTest) <> "")
-End Function
-
 Private Function StyleExists(strStyleName As String, doc As Document) As Boolean
+' 指定 Document 中是否有指定样式
+    
     Dim objStyle As Style
     Dim blnStyleExists As Boolean
     
@@ -691,4 +706,3 @@ Private Function StyleExists(strStyleName As String, doc As Document) As Boolean
         End If
     Next objStyle
 End Function
-
