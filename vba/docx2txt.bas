@@ -3,54 +3,87 @@ Option Explicit
 Option Base 1
 
 Sub Docx2Txt()
-    ' main 方法，处理当前文档
-    ' 注意：
-    ' 1. 本文档为 docm 启用宏的 Word 文档，请在初次打开时启用宏
-    ' 2. 本文档含有 body 基础样式用于格式化文档，请勿删除，如丢失可基于正文样式添加一个名为 body 的样式
-    ' 3. 把待处理的文件内容粘贴至本文档，粘贴选项选择“合并格式”
-    ' 4. 如文档中含有图片，将在本文档同目录中生成 .emf 中间格式图片文件，为避免混乱，可将本文档放置于新建的空白文件夹中
-    ' 5. 事先下载安装 ImageMagick，用于导入图片文件的转换：http://imagemagick.org/script/download.php#windows
+    ' 我的自白：
+    ' 1. 我是启用宏的 Word 文档，请在初次打开我时启用宏
+    ' 2. 我打开的是 docx，吐出的是 jpg 和 txt，txt 编码 UTF-8-BOM Unix(LF)
+    ' 3. 让我处理文档前，先下载安装 ImageMagick，用于导入图片文件的转换：http://imagemagick.org/script/download.php#windows
+    ' 4. 为避免文件混乱，请把我放在一个干干净净的文件夹中
+    ' 5. 我不完美，需要反馈和 bugfix
+    
+    Dim strMainPath As String
+    Dim strNewPath As String
+    Dim fileDialog As fileDialog
+    Dim docToProcess As Document
+    
+    ' 宏文件所在文件夹，也是生成文件之所在
+    strMainPath = ActiveDocument.Path
+    
+    ' 选择要处理的 docx 文件
+    Set fileDialog = Application.fileDialog(msoFileDialogFilePicker)
+    fileDialog.AllowMultiSelect = False
+    fileDialog.Filters.Clear
+    fileDialog.Filters.Add "Word files", "*.docx"
+    
+    If fileDialog.Show = -1 Then
+        'Debug.Print fileDialog.SelectedItems(1)
+        Set docToProcess = Documents.Open(FileName:=fileDialog.SelectedItems(1), AddToRecentFiles:=False, Visible:=False)
+    End If
+    
+    On Error GoTo ErrorHandle
+
+    ' 另存一个新文件，原文件我不碰
+    strNewPath = strMainPath & Application.PathSeparator & docToProcess.Name
+    docToProcess.SaveAs2 FileName:=strNewPath
+    
+    ' =========================== START ==========================
     
     Application.ScreenUpdating = False
     
-    ConvertSuperscriptToHtml ' 上标
-    ConvertSubscriptToHtml   ' 下标
+    ConvertSuperscriptToHtml docToProcess ' 上标
+    ConvertSubscriptToHtml docToProcess  ' 下标
     
-    ConvertListsInOptionsToText           ' 选项中项目编号转为文本
-    ConvertQuestionNoListParagraphsToText ' 题号的项目编号转文本
+    ConvertListsInOptionsToText docToProcess          ' 选项中项目编号转为文本
+    ConvertQuestionNoListParagraphsToText docToProcess ' 题号的项目编号转文本
     
     ' 题干和答案中的列表转为 ol,ul 等 HTML 标签
     ' 目前只支持一级列表，嵌套列表后续完善
-    ConvertListsInBodyToHtml
+    ConvertListsInBodyToHtml docToProcess
     
-    ' 基本样式全文置为 body 样式
-    PreprocessDocumentFormat
+    ' 基本样式全文置为基础样式
+    PreprocessDocumentFormat docToProcess
     
     ' 表格转为 HTML 标签
     ' 目前只支持普通表格和有横向单元格合并的表格
     ' 后续完善有纵向单元格合并的表格
-    ConvertTablesToHtml
+    ConvertTablesToHtml docToProcess
     
-    SaveImagesToDiskFiles ' 导出文档中所有的图片
-    ConvertEmfToJpg       ' emf 转 jpg，同时删除 emf 文件
+    SaveImagesToDiskFiles docToProcess ' 导出文档中所有的图片
+    ConvertEmfToJpg docToProcess       ' emf 转 jpg，同时删除 emf 文件
     
-    ProcessQuestionBody   ' 处理题干
-    ProcessQuestionOption ' 处理选项
-    ProcessAnswer         ' 处理答案
-    PrepareQuestionAttr   ' 处理题目属性字段，把分类、题号、题型等题目字段转成待导入的格式
+    ProcessQuestionBody docToProcess   ' 处理题干
+    ProcessQuestionOption docToProcess ' 处理选项
+    ProcessAnswer docToProcess         ' 处理答案
+    PrepareQuestionAttr docToProcess   ' 处理题目属性字段，把分类、题号、题型等题目字段转成待导入的格式
     
     ' 最后把关，处理遗留格式
-    PostprocessDocumentFormat
+    PostprocessDocumentFormat docToProcess
+
+    docToProcess.Save
 
     Application.ScreenUpdating = True
 
     ' 另存为 txt
-    'SaveMeToTxt
+    SaveMeToTxt docToProcess
+    
+    MsgBox "Hah, DONE!"
+    
+ErrorHandle:
+    Debug.Print Err.Description
 End Sub
 
-Private Sub PreprocessDocumentFormat()
+Private Sub PreprocessDocumentFormat(docToProcess As Document)
     ' 预处理格式
-    With ActiveDocument.Content.Find
+    With docToProcess.Content.Find
         .ClearFormatting
         .Execute FindText:="^l", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=False, Replace:=wdReplaceAll
         .Execute FindText:="^13{2,}", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
@@ -59,12 +92,17 @@ Private Sub PreprocessDocumentFormat()
     End With
 End Sub
 
-Private Sub PostprocessDocumentFormat()
+Private Sub PostprocessDocumentFormat(docToProcess As Document)
     ' 最后处理一下遗留格式
-    ActiveDocument.Select
-    Selection.Style = "body"
+    docToProcess.Range.Select
     
-    With ActiveDocument.Content.Find
+    If StyleExists("正文", docToProcess) = True Then
+        Selection.Style = "正文"
+    ElseIf StyleExists("Normal", docToProcess) = True Then
+        Selection.Style = "Normal"
+    End If
+    
+    With docToProcess.Content.Find
         .ClearFormatting
         .Execute FindText:="</p>^p<", ReplaceWith:="</p><", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
         .Execute FindText:="<p><table", ReplaceWith:="<table", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
@@ -72,10 +110,10 @@ Private Sub PostprocessDocumentFormat()
     End With
 End Sub
 
-Private Sub PrepareQuestionAttr()
-    ActiveDocument.Select
+Private Sub PrepareQuestionAttr(docToProcess As Document)
+    ' 处理题目字段
     
-    With Selection.Find
+    With docToProcess.Content.Find
         .ClearFormatting
         .Execute FindText:="(【题号】*)(【题号】)", ReplaceWith:="\1=end^p\2", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
         .Execute FindText:="【分类】", ReplaceWith:="=category#", Forward:=True, Format:=False, MatchWildcards:=False, Replace:=wdReplaceAll
@@ -93,14 +131,14 @@ Private Sub PrepareQuestionAttr()
     End With
 End Sub
 
-Private Sub ConvertTablesToHtml()
+Private Sub ConvertTablesToHtml(docToProcess As Document)
     ' 把表格转为 HTML 代码
     Dim oTable As Table
     Dim i As Integer
     
     ' 表格前后加空行
-    For i = ActiveDocument.Tables.Count To 1 Step -1
-        ActiveDocument.Tables(i).Range.Select
+    For i = docToProcess.Tables.Count To 1 Step -1
+        docToProcess.Tables(i).Range.Select
         With Selection
             .Cut
             .Text = vbCrLf & vbCrLf & vbCrLf
@@ -110,11 +148,11 @@ Private Sub ConvertTablesToHtml()
         End With
     Next
     
-    IterateTables
+    IterateTables docToProcess
     
 End Sub
 
-Private Sub IterateTables()
+Private Sub IterateTables(docToProcess As Document)
     Dim i As Integer ' 表格索引
     Dim j As Integer ' 表格中的单元格索引
     Dim k As Integer ' 遍历结果行二维数组
@@ -130,8 +168,8 @@ Private Sub IterateTables()
     Dim arrRows() As String ' 某个表格的行数组
     
     ' 遍历当前文档中所有的表格
-    For i = ActiveDocument.Tables.Count To 1 Step -1
-        Set objTable = ActiveDocument.Tables(i)
+    For i = docToProcess.Tables.Count To 1 Step -1
+        Set objTable = docToProcess.Tables(i)
         strTable = "<table>"
         
         ' 重定义存放表格行内容的二维数组
@@ -194,45 +232,43 @@ Private Sub IterateTables()
 
 End Sub
 
-Private Sub ConvertListsInOptionsToText()
+Private Sub ConvertListsInOptionsToText(docToProcess As Document)
     ' 选项中的项目编号转成文字
     ' 先把选项中的项目编号处理掉，再用 ConvertListsInQuestionBodyToHtml 处理题干中的项目编号
-    Dim lp As Paragraph
+    Dim oPara As Paragraph
     
-    ActiveDocument.Select
-    
-    With Selection.Find
+    With docToProcess.Content.Find
         .ClearFormatting
         .Replacement.ClearFormatting
         .Execute FindText:="【选项】*【答案】", Forward:=True, Format:=False, MatchWildcards:=True
         
         Do While .Found = True
-            For Each lp In Selection.Range.listParagraphs
-                lp.Range.ListFormat.ConvertNumbersToText
-            Next lp
+            For Each oPara In Selection.Range.listParagraphs
+                oPara.Range.ListFormat.ConvertNumbersToText
+            Next oPara
             
             .Execute
         Loop
     End With
 End Sub
 
-Private Sub ConvertQuestionNoListParagraphsToText()
+Private Sub ConvertQuestionNoListParagraphsToText(docToProcess As Document)
     ' 题号的项目编号转文本
     Dim oPara As Paragraph
     
-    For Each oPara In ActiveDocument.listParagraphs
+    For Each oPara In docToProcess.listParagraphs
         If StartsWith(oPara.Range.ListFormat.ListString, "【题号】") = True Then
             oPara.Range.ListFormat.ConvertNumbersToText
         End If
     Next oPara
 End Sub
 
-Private Sub ConvertListsInBodyToHtml()
+Private Sub ConvertListsInBodyToHtml(docToProcess As Document)
     ' 题干、答案或解析中项目编号转成 HTML
     Dim oList As List
     Dim oPara As Paragraph
     
-    For Each oList In ActiveDocument.Lists
+    For Each oList In docToProcess.Lists
         With oList.Range
             .MoveStart Unit:=wdCharacter, Count:=-1
             .Select
@@ -251,18 +287,25 @@ Private Sub ConvertListsInBodyToHtml()
             End If
         End With
         
+        Dim strStyleName As String
+        
+        If StyleExists("正文", docToProcess) = True Then
+            strStyleName = "正文"
+        ElseIf StyleExists("Normal", docToProcess) = True Then
+            strStyleName = "Normal"
+        End If
+        
         ' 列表项两端加 <li></li> 标签
         For Each oPara In oList.listParagraphs
-    
             With oPara.Range
-                .Style = "body" ' 这里同样需要基础样式 body
+                .Style = strStyleName
                 .Text = "<li>" & .Text & "</li>"
             End With
         Next
     Next
     
     ' 处理独立成行的 </li> 标签
-    With ActiveDocument.Content.Find
+    With docToProcess.Content.Find
         .ClearFormatting
         .Replacement.ClearFormatting
         .Execute FindText:="^p</li>", ReplaceWith:="</li>", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
@@ -275,25 +318,23 @@ Private Sub ConvertListsInBodyToHtml()
     End With
 End Sub
 
-Private Sub ProcessQuestionBody()
+Private Sub ProcessQuestionBody(docToProcess As Document)
     ' 处理题干
-    Dim doc As Document
+    
     Dim oRange As Range
     Dim oPara As Paragraph
     Dim strBody As String
     Dim strPara As String
     
-    Set doc = ActiveDocument
-    
     ' 【题干】 独立成行
-    With doc.Content.Find
+    With docToProcess.Content.Find
         .ClearFormatting
         .Replacement.ClearFormatting
         .Execute FindText:="【题干】", ReplaceWith:="【题干】^p", Forward:=True, Format:=False, Replace:=wdReplaceAll, MatchWildcards:=False
     End With
     
     ' 遍历【题干】和【 之间的部分
-    Set oRange = doc.Range
+    Set oRange = docToProcess.Range
     With oRange.Find
         .ClearFormatting
         .Replacement.ClearFormatting
@@ -322,7 +363,7 @@ Private Sub ProcessQuestionBody()
     End With
     
     ' 剔除多余的 <p></p> 标签
-    With doc.Content.Find
+    With docToProcess.Content.Find
         .ClearFormatting
         .Replacement.ClearFormatting
         .Execute FindText:="<p><ol", ReplaceWith:="<ol", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
@@ -333,19 +374,16 @@ Private Sub ProcessQuestionBody()
     End With
 End Sub
 
-Private Sub ProcessAnswer()
+Private Sub ProcessAnswer(docToProcess As Document)
     ' 处理主题观的答案
     
-    Dim doc As Document
     Dim oRange As Range
     Dim oPara As Paragraph
     Dim strBody As String
     Dim strPara As String
     
-    Set doc = ActiveDocument
-    
     ' 【答案】 独立成行
-    With doc.Content.Find
+    With docToProcess.Content.Find
         .ClearFormatting
         .Replacement.ClearFormatting
         .Execute FindText:="【答案】", ReplaceWith:="【答案】^p", Forward:=True, Format:=False, Replace:=wdReplaceAll, MatchWildcards:=False
@@ -353,7 +391,7 @@ Private Sub ProcessAnswer()
     End With
     
     ' 遍历【答案】和【 之间的部分
-    Set oRange = doc.Range
+    Set oRange = docToProcess.Range
     With oRange.Find
         .ClearFormatting
         .Replacement.ClearFormatting
@@ -382,7 +420,7 @@ Private Sub ProcessAnswer()
     End With
     
     ' 剔除多余的 <p></p> 标签
-    With doc.Content.Find
+    With docToProcess.Content.Find
         .ClearFormatting
         .Replacement.ClearFormatting
         .Execute FindText:="<p><ol", ReplaceWith:="<ol", Forward:=True, Replace:=wdReplaceAll, MatchWildcards:=False
@@ -393,7 +431,7 @@ Private Sub ProcessAnswer()
     End With
 End Sub
 
-Private Sub ProcessQuestionOption()
+Private Sub ProcessQuestionOption(docToProcess As Document)
     ' 处理选项
     
     Dim oRange As Range
@@ -402,14 +440,14 @@ Private Sub ProcessQuestionOption()
     Dim strOptionAnswer As String
     
     ' 整理选项
-    With ActiveDocument.Content.Find
+    With docToProcess.Content.Find
         .ClearFormatting
         .Replacement.ClearFormatting
         .Execute FindText:="^13([A-Z])[.． ]^9", ReplaceWith:="^p\1#", Forward:=True, Format:=False, Replace:=wdReplaceAll, MatchWildcards:=True
     End With
     
     ' 查找选项区域
-    Set oRange = ActiveDocument.Range
+    Set oRange = docToProcess.Range
     With oRange.Find
         .ClearFormatting
         .Replacement.ClearFormatting
@@ -417,7 +455,7 @@ Private Sub ProcessQuestionOption()
         
         Do While .Found = True
             strOptions = oRange.Text
-            Debug.Print strOptions
+            'Debug.Print strOptions
             
             strOptionAnswer = Mid(oRange.Text, InStr(1, oRange.Text, "【答案】") + 4)
             strOptionAnswer = Replace(strOptionAnswer, vbCrLf, "")
@@ -442,8 +480,7 @@ Private Sub ProcessQuestionOption()
     ' 把选项替换成 =option# 开头的格式
     ' 剔除【选项】行
     ' 剔除选择题的【答案】行
-    Set oRange = ActiveDocument.Range
-    With oRange.Find
+    With docToProcess.Range.Find
         .ClearFormatting
         .Replacement.ClearFormatting
         .Execute FindText:="^13[A-Z]#", ReplaceWith:="^p=option#", Forward:=True, Format:=False, Replace:=wdReplaceAll, MatchWildcards:=True
@@ -452,10 +489,10 @@ Private Sub ProcessQuestionOption()
     End With
 End Sub
 
-Private Sub ConvertSuperscriptToHtml()
+Private Sub ConvertSuperscriptToHtml(docToProcess As Document)
     ' 把上标转为 <sup></sup>
 
-    ActiveDocument.Select
+    docToProcess.Select
    
     With Selection.Find
    
@@ -495,10 +532,10 @@ Private Sub ConvertSuperscriptToHtml()
     End With
 End Sub
 
-Private Sub ConvertSubscriptToHtml()
+Private Sub ConvertSubscriptToHtml(docToProcess As Document)
     ' 把下标转为 <sub></sub>
 
-    ActiveDocument.Select
+    docToProcess.Select
    
     With Selection.Find
    
@@ -538,7 +575,7 @@ Private Sub ConvertSubscriptToHtml()
     End With
 End Sub
 
-Private Sub SaveImagesToDiskFiles()
+Private Sub SaveImagesToDiskFiles(docToProcess As Document)
     ' 把图片另存为文件
     ' 并把文本图片替换为形如 [img]201809121523_001.jpg[/img] 的 BBCode 形式
 
@@ -552,13 +589,13 @@ Private Sub SaveImagesToDiskFiles()
     
     strDateTime = Format(Now(), "YYYYMMDDHHmm_") ' 当前时间 年月日时分
     
-    For i = ActiveDocument.InlineShapes.Count To 1 Step -1
-        Set objShape = ActiveDocument.InlineShapes(i)
+    For i = docToProcess.InlineShapes.Count To 1 Step -1
+        Set objShape = docToProcess.InlineShapes(i)
         objShape.Select
         
         strPictureFileName = strDateTime & PadNumber(CStr(i), 2)
         ' 先存成 emf，后续 check 生成文件时再转为 jpg
-        strOutFilePath = ActiveDocument.Path & Application.PathSeparator & strPictureFileName & ".emf"
+        strOutFilePath = docToProcess.Path & Application.PathSeparator & strPictureFileName & ".emf"
         
         ' 生成文件
         Open strOutFilePath For Binary Access Write As #1
@@ -573,21 +610,21 @@ Private Sub SaveImagesToDiskFiles()
     Next i
 End Sub
 
-Private Sub ConvertEmfToJpg()
+Private Sub ConvertEmfToJpg(docToProcess As Document)
     ' 把生成的 emf 转成 jpg
     Dim imgFileName As String
     Dim newFileName As String
     Dim strCmd As String
     
-    ChDrive Left(ActiveDocument.Path, 1)
-    ChDir ActiveDocument.Path
+    ChDrive Left(docToProcess.Path, 1)
+    ChDir docToProcess.Path
     
     imgFileName = Dir("*.emf")
     Do While imgFileName <> ""
         newFileName = Replace(imgFileName, ".emf", ".jpg")
         ' cmd /S /C magick 201809171713_01.emf 201809171713_01.jpg && del 201809171713_01.emf
         strCmd = "cmd /S /C magick " & imgFileName & " " & newFileName & " && del " & imgFileName
-        Debug.Print strCmd
+        'Debug.Print strCmd
         Call Shell(strCmd, vbHide)
         
         imgFileName = Dir()
@@ -595,20 +632,20 @@ Private Sub ConvertEmfToJpg()
     
 End Sub
 
-Private Sub SaveMeToTxt()
+Private Sub SaveMeToTxt(docToProcess As Document)
     ' 保存成文本文件
-    Dim strFileName As String
+    
     Dim strFilePath As String
+    strFilePath = docToProcess.Path & Application.PathSeparator & docToProcess.Name
+    strFilePath = Mid(strFilePath, 1, InStrRev(strFilePath, ".") - 1)
     
-    strFileName = ActiveDocument.Name
-    strFilePath = ActiveDocument.Path & Application.PathSeparator & strFileName
-    
-    ActiveDocument.SaveAs2 FileName:=strFilePath, FileFormat:= _
-        wdFormatText, LockComments:=False, Password:="", AddToRecentFiles:=True, _
+    docToProcess.SaveAs2 FileName:=strFilePath, FileFormat:= _
+        wdFormatText, LockComments:=False, Password:="", AddToRecentFiles:=False, _
         WritePassword:="", ReadOnlyRecommended:=False, EmbedTrueTypeFonts:=False, _
          SaveNativePictureFormat:=False, SaveFormsData:=False, SaveAsAOCELetter:= _
-        False, Encoding:=936, InsertLineBreaks:=False, AllowSubstitutions:=False, _
-         LineEnding:=wdCRLF, CompatibilityMode:=0
+        False, Encoding:=65001, InsertLineBreaks:=False, AllowSubstitutions:= _
+        False, LineEnding:=wdLFOnly, CompatibilityMode:=0
+    docToProcess.Close
 End Sub
 
 Private Function PadNumber(intNumber As Integer, intLength As Integer) As String
@@ -640,11 +677,18 @@ Private Function FileExists(ByVal FileToTest As String) As Boolean
    FileExists = (Dir(FileToTest) <> "")
 End Function
 
-Private Sub DeleteFile(ByVal FileToDelete As String)
-   If FileExists(FileToDelete) Then 'See above
-      ' First remove readonly attribute, if set
-      SetAttr FileToDelete, vbNormal
-      ' Then delete the file
-      Kill FileToDelete
-   End If
-End Sub
+Private Function StyleExists(strStyleName As String, doc As Document) As Boolean
+    Dim objStyle As Style
+    Dim blnStyleExists As Boolean
+    
+    StyleExists = False
+    
+    For Each objStyle In doc.Styles
+        If objStyle.NameLocal = strStyleName Then
+            StyleExists = True
+            
+            Exit For
+        End If
+    Next objStyle
+End Function
+
