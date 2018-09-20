@@ -3,12 +3,19 @@ Option Explicit
 Option Base 1
 
 Sub Docx2Txt()
+' @VERSION 1.0.0
+' @AUTHOR  WisdomFusion
+'
 ' 我的自白：
 ' 1. 我是启用宏的 Word 文档，请在初次打开我时启用宏
 ' 2. 我打开的是 docx，吐出的是 jpg 和 txt，txt 编码 UTF-8-BOM Unix(LF)
 ' 3. 让我处理文档前，先下载安装 ImageMagick，用于导出图片的格式转换：http://imagemagick.org/script/download.php#windows
 ' 4. 为避免文件混乱，请把我放在一个干干净净的文件夹中
 ' 5. 我不完美，需要反馈和 bugfix
+'
+' CHANGELOG:
+' - 20180920 完善空答案和空选项的情况
+'
     
     Dim strMainPath As String
     Dim strNewPath As String
