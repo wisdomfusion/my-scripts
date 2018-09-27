@@ -3,7 +3,7 @@ Option Explicit
 Option Base 1
 
 Sub Docx2Txt()
-' @VERSION 1.0.0
+' @VERSION 1.0.2
 ' @AUTHOR  WisdomFusion
 '
 ' 我的自白：
@@ -15,6 +15,7 @@ Sub Docx2Txt()
 '
 ' CHANGELOG:
 ' - 20180920 完善空答案和空选项的情况
+' - 20180926 处理选择题括弧；[img] 完善成 [img=w,h] 形式
 '
     
     Dim strMainPath As String
@@ -104,6 +105,7 @@ Private Sub PreprocessBasicFormat(docToProcess As Document)
         .Execute FindText:="^13{2,}", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
         .Execute FindText:="^13[  ^9]{1,}", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
         .Execute FindText:="[  ^9]{1,}^13", ReplaceWith:="^p", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
+        .Execute FindText:="[（\(] {1,}[）\)]", ReplaceWith:="（&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;）", Forward:=True, Format:=False, MatchWildcards:=True, Replace:=wdReplaceAll
     End With
 End Sub
 
@@ -660,11 +662,15 @@ Private Sub SaveImagesToDiskFiles(docToProcess As Document)
     Dim strOutFilePath As String
     Dim strPictureFileName As String
     Dim strDateTime As String
+    Dim intWidth As Integer
+    Dim intHeight As Integer
     
     strDateTime = Format(Now(), "YYYYMMDDHHmm_") ' 当前时间 年月日时分
     
     For i = docToProcess.InlineShapes.Count To 1 Step -1
         Set objInlineShape = docToProcess.InlineShapes(i)
+        intWidth = Round(objInlineShape.Width / 72 * 96)
+        intHeight = Round(objInlineShape.Height / 72 * 96)
         objInlineShape.Select
         
         strPictureFileName = strDateTime & PadNumber(CStr(i), 2)
@@ -680,7 +686,7 @@ Private Sub SaveImagesToDiskFiles(docToProcess As Document)
         
         ' 替换文件的图片
         Selection.Cut
-        Selection.InsertBefore "[img]" & strPictureFileName & ".jpg[/img]" & vbCrLf
+        Selection.InsertBefore "[img=" & CStr(intWidth) & "," & CStr(intHeight) & "]" & strPictureFileName & ".jpg[/img]" & vbCrLf
     Next i
     
     With docToProcess.Content.Find
