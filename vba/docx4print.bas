@@ -1,12 +1,12 @@
 Attribute VB_Name = "NewMacros"
 Option Explicit
 
-Sub Doc2Docx()
-' @VERSION 1.0.0
+Sub Docx4Print()
+' @VERSION 1.0.2
 ' @AUTHOR  WisdomFusion
 '
 ' 我都干了些什么的：
-' - 把链接的图片本地化
+' - 把链接的图片本地化（这一步必须联网，因为是把网上的图片抓抓抓到本地存起来）
 ' - 规范样式
 ' - 加上页码
 '
@@ -46,6 +46,9 @@ Sub Doc2Docx()
     ' 添加页脚
     AddFooter oDoc
     
+    ' 删除页眉
+    DeleteAllHeaders oDoc
+    
     oDoc.Save
     
     oDoc.Close
@@ -55,7 +58,7 @@ Sub Doc2Docx()
 End Sub
 
 
-Sub ConvertLinked(oDoc As Document)
+Private Sub ConvertLinked(oDoc As Document)
 ' 把链接的图片本地化
     
     Debug.Print "ConvertLinked"
@@ -79,7 +82,7 @@ Sub ConvertLinked(oDoc As Document)
 
 End Sub
 
-Sub AddFooter(oDoc As Document)
+Private Sub AddFooter(oDoc As Document)
 ' 添加页脚
 
     Debug.Print "AddFooter"
@@ -88,24 +91,42 @@ Sub AddFooter(oDoc As Document)
     Dim oRangePage As Range
     Dim oRangeNumPages As Range
 
-    With oDoc.Sections(1).Footers(wdHeaderFooterPrimary)
-        .Range.Text = "第 PAGE 页，共 NUMPAGES 页"
-        .Range.ParagraphFormat.Alignment = wdAlignParagraphCenter
-        
-        ConvertFields .Range, "NUMPAGES"
-        ConvertFields .Range, "PAGE"
-        
-        .Range.Fields.Update
+    With oDoc.Sections(1)
+    
+        With .Footers(wdHeaderFooterPrimary)
+            .Range.Text = "第 PAGE 页 / 共 NUMPAGES 页"
+            .Range.ParagraphFormat.Alignment = wdAlignParagraphCenter
+            
+            ConvertFields .Range, "NUMPAGES"
+            ConvertFields .Range, "PAGE"
+            
+            .Range.Fields.Update
+        End With
     End With
 
 End Sub
 
-Sub StandardizeStyles(oDoc As Document)
+Private Sub DeleteAllHeaders(oDoc As Document)
+' 删除所有的页眉，因为目前没有这个需求，避免出现带横线的空页眉
+
+    Dim objSection As Section
+    Dim objHeader As HeaderFooter
+    
+    For Each objSection In oDoc.Sections
+        For Each objHeader In objSection.Headers
+            objHeader.Range.Delete
+        Next objHeader
+    Next objSection
+
+End Sub
+
+Private Sub StandardizeStyles(oDoc As Document)
 ' 标准化样式
 
     Debug.Print "StandardizeStyles"
     
     ' 还没想好。。。再说吧。。。
+    ' 你！可以提需求！
     
 End Sub
 
