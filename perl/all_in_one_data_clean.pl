@@ -11,8 +11,8 @@ my $word_list_ref = { };
 # 词性正则
 my $regex_pos = qr/^(vt|vi|v|adv|n|pron|prep|det|excl|interj|int|conj|aux)\.\s*(.+)$/;
 
-my $infile  = 'all_in_v3.txt';
-my $outfile = 'all_in_v4.txt';
+my $infile  = 'all_in_one_v3.txt';
+my $outfile = 'all_in_one_v4.txt';
 
 open(my $fh_in,  '<', $infile)  or die $!;
 open(my $fh_out, '>', $outfile) or dir $!;
