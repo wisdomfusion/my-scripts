@@ -3,7 +3,6 @@ use 5.12.0;
 use utf8;
 use open ':std', ':encoding(UTF-8)';
 
-use Socket qw(:DEFAULT :crlf);
 use Data::Dump qw(dump);
 
 my $word_list_ref = { };
@@ -61,9 +60,9 @@ foreach my $key (sort keys %$word_list_ref) {
             my @meaning_array = &uniq( @{ $meaning_ref->{$k} } );
 
             if ($k eq '_NOPOS_') {
-                $result .= ( join '，', @meaning_array ) . "；";
+                $result .= ( join '，', @meaning_array ) . " ";
             } else {
-                $result .= $k . " " . ( join '，', @meaning_array ) . "；";
+                $result .= $k . " " . ( join '，', @meaning_array ) . " ";
             }
          }
     }
@@ -71,10 +70,11 @@ foreach my $key (sort keys %$word_list_ref) {
     $result_meanings .= $result;
     $result_meanings =~ s/[；，]$//g;
     $result_meanings =~ s/^[；，]//g;
+    $result_meanings =~ s/\s+$//g;
 
     $word_list_ref->{$key}->{result_meanings} = $result_meanings;
 
-    my $out = $word_list_ref->{$key}->{word} . "\t" . $word_list_ref->{$key}->{result_meanings} . "$CRLF";
+    my $out = $word_list_ref->{$key}->{word} . "\t" . $word_list_ref->{$key}->{result_meanings} . "\n";
     #print $out;
 
     #say $key, "\t", $word_list_ref->{$key}->{word}, "\t", $word_list_ref->{$key}->{result_meanings};
