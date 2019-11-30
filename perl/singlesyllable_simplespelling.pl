@@ -18,8 +18,8 @@ my @vowels = qw( a e i y o u );
 # 辅音音素对应的字母
 my @consonants = qw( b c d f g h j k l m n p q r s t v w x y z );
 
-my @sorted_vowel_combs     = sort { length $b <=> length $a } ( sort @vowel_combs );     # 先长度后字段排序
-my @sorted_consonant_combs = sort { length $b <=> length $a } ( sort @consonant_combs ); # 先长度后字段排序
+my @sorted_vowel_combs     = sort { length $b <=> length $a } ( sort @vowel_combs );     # 先长度后字母排序
+my @sorted_consonant_combs = sort { length $b <=> length $a } ( sort @consonant_combs ); # 先长度后字母排序
 my @sorted_vowels          = sort @vowels;
 my @sorted_consonants      = sort @consonants;
 
