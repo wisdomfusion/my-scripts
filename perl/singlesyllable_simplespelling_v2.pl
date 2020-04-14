@@ -6,7 +6,8 @@ use open ':std', ':encoding(UTF-8)';
 use Socket qw(:DEFAULT :crlf);
 use Data::Dump qw(dump);
 
-my $ref_vowel_combs = {
+# 元音因素对应的字母组合
+my $vowel_combs_ref = {
     ought => 'iught',
     eigh  => 'aigh',
     ture  => 'true',
@@ -63,48 +64,87 @@ my $ref_vowel_combs = {
     uy => 'ey',
 };
 
-# 元音因素对应的字母组合
-my @vowel_combs = qw( ai air al ar are au aur aw ay ea ear ee eer ei eigh eir er ere eu ew ey ie igh ing ir ire oa oar oi ol oo oor or ore ou ought oul our ow oy ture ui ur ure uy eal ool oal oll ier ale all ial ue );
-
 # 辅音音素对应的字母组合
-my @consonant_combs = qw( ch ck dd dge dj dr ds ff gh ght gn gu gue kn ll mm mn ng nn ph pp qu sc sh sion ss sure tch th the tion tr ts tt wh wr ssion );
+my $consonant_combs_ref = {
+    ssion => 'ation',
+    sion => 'tion',
+    sure => 'ture',
+    tion => 'sion',
+    dge => 'gue',
+    ght => 'igh',
+    gue => 'que',
+    tch => 'che',
+    the => 'she',
+    ch => 'sh',
+    ck => 'sk',
+    dd => 'de',
+    dj => 'dg',
+    dr => 'tr',
+    ds => 'dz',
+    ff => 'ph',
+    gh => 'ph',
+    gn => 'gu',
+    gu => 'gi',
+    kn => 'nk',
+    ll => 'il',
+    mm => 'mn',
+    mn => 'nm',
+    ng => 'gn',
+    nn => 'nm',
+    ph => 'ff',
+    pp => 'ph',
+    qu => 'kw',
+    sc => 'ss',
+    sh => 'ch',
+    ss => 'sc',
+    th => 'sh',
+    tr => 'dr',
+    ts => 'tz',
+    tt => 'te',
+    wh => 'wr',
+    wr => 'wh',
+};
 
 # 元音音素对应的字母
 my @vowels = qw( a e i y o u );
 
-my $str_vowels = join '', @vowels;
-
 # 辅音音素对应的字母
-my @consonants = qw( b c d f g h j k l m n p q r s t v w x y z );
-
-my $str_consonants = join '', @consonants;
-
-my @sorted_vowel_combs     = sort { length $b <=> length $a } ( sort @vowel_combs );     # 先长度后字母排序
-my @sorted_consonant_combs = sort { length $b <=> length $a } ( sort @consonant_combs ); # 先长度后字母排序
-my @sorted_vowels          = sort @vowels;
-my @sorted_consonants      = sort @consonants;
-
-#say join "\n", @sorted_vowel_combs;
-#say join "\n", @sorted_consonant_combs;
-#say join "\n", @sorted_vowels;
-#say join "\n", @sorted_consonants;
-
-my @all_combs = ( @sorted_vowel_combs, @sorted_consonant_combs, @sorted_vowels, @sorted_consonants );
-
-#say dump @all_combs;
-#say join "\n", @all_combs;
+my $consonants_ref = {
+    b => 'p',
+    c => 'k',
+    d => 'b',
+    f => 'v',
+    g => 'j',
+    h => 'n',
+    j => 'g',
+    k => 'c',
+    l => 'r',
+    m => 'n',
+    n => 'm',
+    p => 'b',
+    q => 'k',
+    r => 'l',
+    s => 'z',
+    t => 'd',
+    v => 'w',
+    w => 'v',
+    x => 's',
+    y => 'i',
+    z => 's',
+};
 
 while ( <DATA> ) {
     chomp;
     
     my $word = $_;
     
-    my $result_word  = ''; # 结果单词
-    my $matched_chas = ''; # 匹配的字母（组合）
-    my $mark         = '';
+    my $result_word   = ''; # 结果单词
+    my $matched_chars = ''; # 匹配的字母（组合）
+    my $alter_chars   = '';
+    my $mark          = '';
     
     # 元音因素对应的字母组合
-    foreach my $vowel ( @sorted_vowel_combs ) {
+    foreach my $vowel ( sort { length $b <=> length $a } ( sort keys %$vowel_combs_ref ) ) {
         # 不全挖
         next if length $word == length $vowel;
         
@@ -114,24 +154,37 @@ while ( <DATA> ) {
             $result_word = $word;
             $result_word =~ s/$vowel/$mark/ie;
             
-            print $word, "\t", $result_word, $LF;
+            $matched_chars = $vowel;
+            $alter_chars   = $vowel_combs_ref->{$vowel};
+            
+            print $word, "\t", $result_word, "\t", $matched_chars, "\t", $alter_chars, $LF;
             
             goto LABEL;
         }
     }
     
-    # 元音辅音e
+    # 元音+辅音+e
     if ( $word =~ /([aeiou])[bcdfghjklmnpqstvwxyz]e/i ) {
+        my $current_vw = $1;
+        
+        my $vowels  = 'aeiou';
+        my $rest_vw = $vowels;
+        $rest_vw    =~ s/$current_vw//i;
+        my @rest_vw = split '', $rest_vw;
+        
         $result_word = $word;
         $result_word =~ s/[aeiou]([bcdfghjklmnpqstvwxyz])e/_$1_/i;
         
-        print $word, "\t", $result_word, $LF;
+        $matched_chars = $current_vw . '_e';
+        $alter_chars   = $rest_vw[ int rand scalar @rest_vw ] . '_e';
+    
+        print $word, "\t", $result_word, "\t", $matched_chars, "\t", $alter_chars, $LF;
         
         goto LABEL;
     }
     
     # 辅音音素对应的字母组合
-    foreach my $consonant ( @sorted_consonant_combs ) {
+    foreach my $consonant ( sort { length $b <=> length $a } ( sort keys %$consonant_combs_ref ) ) {
         # 不全挖
         next if length $word == length $consonant;
         
@@ -141,14 +194,17 @@ while ( <DATA> ) {
             $result_word = $word;
             $result_word =~ s/$consonant/$mark/ie;
             
-            print $word, "\t", $result_word, $LF;
+            $matched_chars = $consonant;
+            $alter_chars   = $consonant_combs_ref->{$consonant};
+            
+            print $word, "\t", $result_word, "\t", $matched_chars, "\t", $alter_chars, $LF;
             
             goto LABEL;
         }
     }
     
     # 元音音素对应的字母
-    foreach my $vw ( @sorted_vowels ) {
+    foreach my $vw ( @vowels ) {
         # 不全挖
         next if length $word == length $vw;
 
@@ -160,14 +216,22 @@ while ( <DATA> ) {
             $result_word = $word;
             $result_word =~ s/$vw/$mark/ie;
             
-            print $word, "\t", $result_word, $LF;
+            my $vowels  = 'aeiou';
+            my $rest_vw = $vowels;
+            $rest_vw =~ s/$vw//i;
+            my @rest_vw = split '', $rest_vw;
+        
+            $matched_chars = $vw;
+            $alter_chars   = $rest_vw[ int rand scalar @rest_vw ];
+            
+            print $word, "\t", $result_word, "\t", $matched_chars, "\t", $alter_chars, $LF;
             
             goto LABEL;
         }
     }
     
     # 辅音音素对应的字母
-    foreach my $co ( @sorted_consonants ) {
+    foreach my $co ( sort keys %$consonants_ref ) {
         # 不全挖
         next if length $word == length $co;
         
@@ -177,7 +241,10 @@ while ( <DATA> ) {
             $result_word = $word;
             $result_word =~ s/$co/$mark/ie;
             
-            print $word, "\t", $result_word, $LF;
+            $matched_chars = $co;
+            $alter_chars   = $consonants_ref->{$co};
+            
+            print $word, "\t", $result_word, "\t", $matched_chars, "\t", $alter_chars, $LF;
             
             goto LABEL;
         }
@@ -185,10 +252,12 @@ while ( <DATA> ) {
     
     LABEL:
     ;
+    
+    #exit if $. == 1;
 }
 
 __DATA__
-Athelney
+bAthelney
 blare
 blaze
 blot
