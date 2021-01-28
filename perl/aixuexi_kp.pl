@@ -8,8 +8,8 @@ no Smart::Comments "###";
 use JSON;
 use Data::Dumper;
 
-my $in_filename  = 'aixuexi_kp_primary.txt';
-my $out_filename = 'aixuexi_kp_primary_out.txt';
+my $in_filename  = 'aixuexi_kp_junior.txt';
+my $out_filename = 'aixuexi_kp_junior_out.txt';
 
 my $json_text = do {
     open( my $fh_in, '<', $in_filename ) or die $!;
@@ -39,9 +39,17 @@ sub traverse_kp {
         my $out_str = "\t" x $kp->{level} . $kp->{name};
         &print_file_line( $fh_out, $out_str );
         
+        if ( $kp->{knowledges} ) {
+            foreach my $k ( @{$kp->{knowledges}} ) {
+                $out_str = "\t" x ( $kp->{level} + 1 ) . $k->{name};
+                &print_file_line( $fh_out, $out_str );
+            }
+        }
+        
         next if !$kp->{childs};
         
-        my $children  = $kp->{childs};
+        my $children   = $kp->{childs};
+        
         my $level     = ++$kp->{level};
         $kp->{childs} = [ map { $_->{level} = $level; $_ } @{$children} ];
         
