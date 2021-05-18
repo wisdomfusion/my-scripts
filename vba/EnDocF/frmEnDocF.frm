@@ -176,6 +176,9 @@ RemovePrepareRedundance
 ' 还原空行
 WfRestoreBlankLine
 
+' 处理域中的空格
+TrimFieldSpaces
+
 Application.ScreenUpdating = True
 
 MsgBox "文档格式调整 DONE!"
@@ -266,11 +269,21 @@ With oDoc.Styles("正文").ParagraphFormat
     .CharacterUnitFirstLineIndent = 0
 End With
 
-If Not HasStyle("正文_Indent2") Then
-    Set oStyle = oDoc.Styles.Add("正文_Indent2")
-    oStyle.BaseStyle = oDoc.Styles("正文")
-    oStyle.ParagraphFormat.CharacterUnitFirstLineIndent = 2
+' 首行缩进2个字符的样式
+
+Dim oStyle2 As Style
+
+If HasStyle("正文_Indent2") Then
+    oDoc.Styles("正文_Indent2").Delete
 End If
+
+Set oStyle2 = oDoc.Styles.Add("正文_Indent2")
+
+With oStyle2
+    .BaseStyle = oDoc.Styles("正文")
+    .ParagraphFormat.CharacterUnitFirstLineIndent = 2
+    .ParagraphFormat.Alignment = wdAlignParagraphJustify
+End With
 
 End Sub
 
@@ -280,11 +293,13 @@ Private Sub ApplyBodyStyle()
 Selection.WholeStory
 
 With Selection
+    .ParagraphFormat.Alignment = wdAlignParagraphJustify ' 两端对齐
     .Style = ActiveDocument.Styles("正文")
     
     With .Font
         .Color = vbBlack
         .Size = 10
+        ' 字体
         .NameFarEast = "思源黑体 Regular"
         .NameAscii = "Verdana"
         .NameOther = "Verdana"
@@ -308,13 +323,13 @@ Selection.Style = ActiveDocument.Styles("正文")
 End Sub
 
 Private Sub WfMarkBlankLine()
-' 已有空行标记 ==
+' 已有空行标记 ||||
 
 With ActiveDocument.Content.Find
     .ClearFormatting
     .Replacement.ClearFormatting
     .Text = "^13^13"
-    .Replacement.Text = "^p==^p"
+    .Replacement.Text = "^p||||^p"
     .MatchWildcards = True
     .Wrap = wdFindContinue
     .Execute Replace:=wdReplaceAll
@@ -328,7 +343,7 @@ Private Sub WfRestoreBlankLine()
 With ActiveDocument.Content.Find
     .ClearFormatting
     .Replacement.ClearFormatting
-    .Text = "==^13"
+    .Text = "\|{4}^13"
     .Replacement.Text = "^p"
     .MatchWildcards = True
     .Wrap = wdFindContinue
@@ -361,7 +376,6 @@ With ActiveDocument.Content.Find
     .Wrap = wdFindContinue
     .Execute Replace:=wdReplaceAll
 End With
-
 End Sub
 
 Private Sub WfRemoveEmptyBrackets()
@@ -408,7 +422,6 @@ For Each oStyle In ActiveDocument.Styles
         has = True
     End If
 Next
-
 HasStyle = has
 End Function
 
@@ -422,7 +435,6 @@ For Each oRange In ActiveDocument.Characters
         Selection.Font.Name = "Verdana"
     End If
 Next
-
 End Sub
 
 Private Sub AdjustChoiceNo()
@@ -434,6 +446,8 @@ With ActiveDocument.Content.Find
     .ClearFormatting
     .Replacement.ClearFormatting
     .Forward = True
+    
+    ' A.
     .Wrap = wdFindContinue
     
     ' A.
@@ -474,6 +488,8 @@ With ActiveDocument.Content.Find
     ' 图片前加空格
     .Execute FindText:="^g", ReplaceWith:=" ^&", MatchWildcards:=False, Replace:=wdReplaceAll
     
+    ' 行首数字题号 16.
+    .Execute FindText:="^13([0-9]{1,})．", ReplaceWith:="^p\1. ", MatchWildcards:=True, Replace:=wdReplaceAll
     
     ' 英文标点后确保有英文空格 (后跟非标点时)
     '
@@ -492,6 +508,12 @@ With ActiveDocument.Content.Find
     .Execute FindText:="t['’] s([!a-z])", ReplaceWith:="t's\1", MatchWildcards:=True, Replace:=wdReplaceAll
     .Execute FindText:="t ['’]s([!a-z])", ReplaceWith:="t's\1", MatchWildcards:=True, Replace:=wdReplaceAll
     .Execute FindText:="t ['’] s([!a-z])", ReplaceWith:="t's\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    
+    ' 特例：He's, She's, Here's
+    .Execute FindText:="e’s([!a-z])", ReplaceWith:="e's\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="e['’] s([!a-z])", ReplaceWith:="e's\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="e ['’]s([!a-z])", ReplaceWith:="e's\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="e ['’] s([!a-z])", ReplaceWith:="e's\1", MatchWildcards:=True, Replace:=wdReplaceAll
     
     ' 特例：I'd
     .Execute FindText:="’d([!a-z])", ReplaceWith:="'d\1", MatchWildcards:=True, Replace:=wdReplaceAll
@@ -567,10 +589,12 @@ With ActiveDocument.Content.Find
     .Execute FindText:="^13([0-9])[、.．]", ReplaceWith:="^p\1. ", MatchWildcards:=True, Replace:=wdReplaceAll
 End With
 
+Selection.HomeKey Unit:=wdStory
+
 ' 按123456...顺序排列
 Dim i As Integer
 i = 1
-With ActiveDocument.Content.Find
+With Selection.Find
     .Text = "^13[0-9]{1,3}\."
     .Replacement.Text = ""
     .Forward = True
@@ -589,7 +613,6 @@ With ActiveDocument.Content.Find
     Loop
 End With
 
-' 回到文档头
 Selection.HomeKey Unit:=wdStory
 
 ' 参考答案与试题解析重新1起点
@@ -631,5 +654,71 @@ End With
 
 Application.ScreenUpdating = True
 
+End Sub
+
+Private Sub TrimFieldSpaces()
+' 处理域中的空格
+
+Application.ScreenUpdating = False
+
+' 把文档中的域转成“域代码文本”
+ConvertFieldCodeToText
+
+' 替换域代码中多余的空格
+
+With ActiveDocument.Content.Find
+    .Text = "\{ @([a-zA-Z]@) @([!\}]@) @\}"
+    .Replacement.Text = "{\1 \2}"
+    .Wrap = wdFindContinue
+    .MatchWildcards = True
+    .Execute Replace:=wdReplaceAll
+End With
+
+' 转成“域代码文本”后再转回域
+ConvertFieldTextBackToCode
+
+Application.ScreenUpdating = True
+End Sub
+
+Private Sub ConvertFieldCodeToText()
+' 把文档中的域转成“域代码文本”
+
+Dim oField As Field
+
+ActiveWindow.View.ShowFieldCodes = True
+For Each oField In ActiveDocument.Fields
+    oField.Select
+    Selection.Text = "{ " & Selection.Fields(1).Code.Text & " }"
+Next
+ActiveWindow.View.ShowFieldCodes = False
+End Sub
+
+Private Sub ConvertFieldTextBackToCode()
+' 转成“域代码文本”后再转回域
+
+Dim oRange As Range
+Dim oField As Field
+
+Selection.HomeKey Unit:=wdStory
+
+With Selection.Find
+    .Forward = True
+    .MatchWildcards = True
+    .Text = "\{[a-zA-Z]@ [!\}]@\}"
+    .Replacement.Text = ""
+    .Execute
+    
+    Do While .Found = True
+        Set oRange = Selection.Range
+        oRange.Characters.First.Delete
+        oRange.Characters.Last.Delete
+        oRange.Copy
+        
+        Set oField = ActiveDocument.Fields.Add(oRange, wdFieldEmpty, oRange.Text, False)
+        oField.Code.Paste
+        
+        .Execute
+    Loop
+End With
 End Sub
 
