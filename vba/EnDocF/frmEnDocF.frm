@@ -1,10 +1,10 @@
 VERSION 5.00
 Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} frmEnDocF 
    Caption         =   "英语试卷批处理 v2.0"
-   ClientHeight    =   7410
+   ClientHeight    =   3150
    ClientLeft      =   20595
    ClientTop       =   6465
-   ClientWidth     =   11760
+   ClientWidth     =   4800
    OleObjectBlob   =   "frmEnDocF.frx":0000
    ShowModal       =   0   'False
    StartUpPosition =   1  '所有者中心
@@ -266,8 +266,8 @@ With oDoc.Styles("正文").ParagraphFormat
     .CharacterUnitFirstLineIndent = 0
 End With
 
-If Not HasStyle("正文_缩进2字符") Then
-    Set oStyle = oDoc.Styles.Add("正文_缩进2字符")
+If Not HasStyle("正文_Indent2") Then
+    Set oStyle = oDoc.Styles.Add("正文_Indent2")
     oStyle.BaseStyle = oDoc.Styles("正文")
     oStyle.ParagraphFormat.CharacterUnitFirstLineIndent = 2
 End If
@@ -278,8 +278,33 @@ Private Sub ApplyBodyStyle()
 ' 全文应用“正文”样式
 
 Selection.WholeStory
-Selection.ClearFormatting
+
+With Selection
+    .Style = ActiveDocument.Styles("正文")
+    
+    With .Font
+        .Color = vbBlack
+        .Size = 10
+        .NameFarEast = "思源黑体 Regular"
+        .NameAscii = "Verdana"
+        .NameOther = "Verdana"
+        .Name = "Verdana"
+    End With
+End With
 Selection.Style = ActiveDocument.Styles("正文")
+
+' 逐字设置字体
+' 这种方式有些暴力，而且有好多情况不好处理，还是换成上述方式吧
+'Set oRange = ActiveDocument.Characters
+'For Each oWord In oRange
+'    ' 参考 ASCII Table：http://www.asciitable.com/
+'    If Asc(oWord.Text) >= 33 And Asc(oWord.Text) <= 127 Then
+'        oWord.Font.Name = "Verdana"
+'    Else
+'        oWord.Font.Name = "思源黑体 Regular"
+'    End If
+'Next
+
 End Sub
 
 Private Sub WfMarkBlankLine()
@@ -331,7 +356,7 @@ Private Sub WfRestoreFirstLineIndent()
 With ActiveDocument.Content.Find
     .Text = "【【([!^13]@)^13"
     .Replacement.Text = "\1^p"
-    .Replacement.Style = ActiveDocument.Styles("正文_缩进2字符")
+    .Replacement.Style = ActiveDocument.Styles("正文_Indent2")
     .MatchWildcards = True
     .Wrap = wdFindContinue
     .Execute Replace:=wdReplaceAll
@@ -417,9 +442,9 @@ With ActiveDocument.Content.Find
     ' D.
     .Execute FindText:="^13([A-D])[.．。][ 　]@([!^13]@)^13", ReplaceWith:="^p\1.\2^p", MatchWildcards:=True, Replace:=wdReplaceAll
     
+    ' 因为查找表达式有长度限制，所以 ABCD 分成两次处理
     ' A. B. C.
     .Execute FindText:="^13A[.．。]([!^13]@)B[.．。]([!^13]@)C[.．。]([!^13]@)^13", ReplaceWith:="^pA. \1B. \2C. \3^p", MatchWildcards:=True, Replace:=wdReplaceAll
-    
     ' D.
     .Execute FindText:="^13(A.[!^13]@)D[.．。]([!^13]@)^13", ReplaceWith:="^p\1D. \2^p", MatchWildcards:=True, Replace:=wdReplaceAll
     
@@ -463,31 +488,37 @@ With ActiveDocument.Content.Find
     .Execute FindText:="([a-zA-Z])\(", ReplaceWith:="\1 (", MatchWildcards:=True, Replace:=wdReplaceAll
     
     ' 特例：Let's, What's
-    .Execute FindText:="t' s([!a-z])", ReplaceWith:="t's\1", MatchWildcards:=True, Replace:=wdReplaceAll
-    .Execute FindText:="t 's([!a-z])", ReplaceWith:="t's\1", MatchWildcards:=True, Replace:=wdReplaceAll
-    .Execute FindText:="t ' s([!a-z])", ReplaceWith:="t's\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="t’s([!a-z])", ReplaceWith:="t's\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="t['’] s([!a-z])", ReplaceWith:="t's\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="t ['’]s([!a-z])", ReplaceWith:="t's\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="t ['’] s([!a-z])", ReplaceWith:="t's\1", MatchWildcards:=True, Replace:=wdReplaceAll
     
     ' 特例：I'd
-    .Execute FindText:="' d([!a-z])", ReplaceWith:="'d\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="’d([!a-z])", ReplaceWith:="'d\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="['’] d([!a-z])", ReplaceWith:="'d\1", MatchWildcards:=True, Replace:=wdReplaceAll
     
     ' 特例：I'll
-    .Execute FindText:="' ll([!a-z])", ReplaceWith:="'ll\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="’ll([!a-z])", ReplaceWith:="'ll\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="['’] ll([!a-z])", ReplaceWith:="'ll\1", MatchWildcards:=True, Replace:=wdReplaceAll
     
     ' 特例：We're
-    .Execute FindText:="' re([!a-z])", ReplaceWith:="'re\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="’re([!a-z])", ReplaceWith:="'re\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="['’] re([!a-z])", ReplaceWith:="'re\1", MatchWildcards:=True, Replace:=wdReplaceAll
     
     ' 特例：don't, isn' t
-    .Execute FindText:="n' t([!a-z])", ReplaceWith:="n't\1", MatchWildcards:=True, Replace:=wdReplaceAll
-    .Execute FindText:="n 't([!a-z])", ReplaceWith:="n't\1", MatchWildcards:=True, Replace:=wdReplaceAll
-    .Execute FindText:="n ' t([!a-z])", ReplaceWith:="n't\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="n’t([!a-z])", ReplaceWith:="n't\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="n['’] t([!a-z])", ReplaceWith:="n't\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="n ['’]t([!a-z])", ReplaceWith:="n't\1", MatchWildcards:=True, Replace:=wdReplaceAll
+    .Execute FindText:="n ['’] t([!a-z])", ReplaceWith:="n't\1", MatchWildcards:=True, Replace:=wdReplaceAll
     
     ' 特例：I'm
-    .Execute FindText:="I' m", ReplaceWith:="I'm", MatchWildcards:=False, Replace:=wdReplaceAll
-    .Execute FindText:="I 'm", ReplaceWith:="I'm", MatchWildcards:=False, Replace:=wdReplaceAll
-    .Execute FindText:="I ' m", ReplaceWith:="I'm", MatchWildcards:=False, Replace:=wdReplaceAll
+    .Execute FindText:="I’m", ReplaceWith:="I'm", MatchWildcards:=False, Replace:=wdReplaceAll
+    .Execute FindText:="I['’] m", ReplaceWith:="I'm", MatchWildcards:=False, Replace:=wdReplaceAll
+    .Execute FindText:="I ['’]m", ReplaceWith:="I'm", MatchWildcards:=False, Replace:=wdReplaceAll
+    .Execute FindText:="I ['’] m", ReplaceWith:="I'm", MatchWildcards:=False, Replace:=wdReplaceAll
 
     ' 特例：o'clock
-    .Execute FindText:="' clock", ReplaceWith:="'clock", MatchWildcards:=False, Replace:=wdReplaceAll
+    .Execute FindText:="['’] clock", ReplaceWith:="'clock", MatchWildcards:=False, Replace:=wdReplaceAll
     
     ' 特例：Tian'anmen
     .Execute FindText:="Tian' anmen", ReplaceWith:="Tian'anmen", MatchWildcards:=False, Replace:=wdReplaceAll
@@ -590,7 +621,7 @@ With Selection.Find
 End With
 
 ' 规范 (1)
-With Selection.Find
+With ActiveDocument.Content.Find
     .Text = "^13[\(（]([0-9]{1,})[\)）]"
     .Replacement.Text = "^p(\1) "
     .Wrap = wdFindContinue
@@ -598,6 +629,7 @@ With Selection.Find
     .Execute Replace:=wdReplaceAll
 End With
 
-End Sub
+Application.ScreenUpdating = True
 
+End Sub
 
