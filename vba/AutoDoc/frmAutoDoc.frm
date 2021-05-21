@@ -1,12 +1,11 @@
 VERSION 5.00
 Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} frmAutoDoc 
-   Caption         =   "英语试卷AutoDoc v2.3"
-   ClientHeight    =   3150
-   ClientLeft      =   20595
-   ClientTop       =   6465
-   ClientWidth     =   3600
+   Caption         =   "英语试卷AutoDoc v2.4.1"
+   ClientHeight    =   2865
+   ClientLeft      =   120
+   ClientTop       =   465
+   ClientWidth     =   3465
    OleObjectBlob   =   "frmAutoDoc.frx":0000
-   ShowModal       =   0   'False
    StartUpPosition =   1  '所有者中心
 End
 Attribute VB_Name = "frmAutoDoc"
@@ -501,10 +500,11 @@ Private Sub ApplyFontToAnalysis()
     
     Selection.SetRange Start:=Selection.Start, End:=ActiveDocument.Content.End
     With Selection.Font
-        .NameFarEast = "思源黑体 Regular"
-        .NameAscii = "Verdana"
-        .NameOther = "Verdana"
-        .Name = "Verdana"
+        '.NameFarEast = "思源黑体 Regular"
+        '.NameAscii = "Verdana"
+        '.NameOther = "Verdana"
+        '.Name = "Verdana"
+        .Name = "思源黑体 Regular"
     End With
     
     Dim ch As Range
@@ -816,5 +816,7 @@ Private Sub ConvertQuoteFieldTextBackToCode()
     Loop
 End With
 End Sub
+
+
 
 
