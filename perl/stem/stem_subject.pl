@@ -34,9 +34,7 @@ for my $e ($tx->result->dom('#sub_left li a')->each) {
     push(@$subjects, { subject_id => $id_str, subject => $subject});
 }
 
-#say Dumper $subjects;
-
-# 解析
+# 解析排行数据
 
 my $head = "ID\tHOSPNAME\tPROVINCE\tGB_NAME\tGB_CODE\tINPUT\tOUTPUT\tINFLUENCE\tSUM\tRANK\tyear\tsubject_id\tsubject";
 say $head;
@@ -52,7 +50,7 @@ for my $s (@$subjects) {
         for my $num (1..5) {
             #say $num;
             
-            my $tx   = $ua->post($url => form => {year => $year, subject => 320, start => $num, end => 20});
+            my $tx   = $ua->post($url => form => {year => $year, subject => $s->{subject_id}, start => $num, end => 20});
             my $body = $tx->result->body;
             
             my $rank_list = decode_json($body);
