@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# deploy_next.sh
-# Deploy Script for Next.js Application
+# deploy_express.sh
+# Deploy Script for Node.js/Express.js Application
 
 # 约定：
 # 1. 应用名称：对应 git repo 名称
-# 2. Next.js 应用已配置为 standalone output 模式
-# 3. 使用 pm2 管理应用进程
-# 4. 常用目录或路径：
+# 2. 使用 pm2 管理应用进程
+# 3. 常用目录或路径：
 #   - rsync user 为 root，做好安全加固
 #   - rsync src 路径为约定预定义路径
 #   - 编译脚本日志路径
@@ -16,9 +15,9 @@
 # -e 可选，部署环境：prod 生产环境（默认，空），stage 预发环境，预发环境的路径中添加 `stage_`
 # -p pm2 ecosystem.config.js 中的环境名称，可指定 production, staging, development
 # -h, --rsync-host 编译服务器 IP，开启 rsyncd
-# eg. ./deploy_next.sh -n "project-web-next" -p production -h "172.17.212.193"
+# eg. ./deploy_express.sh -n "med-selection-web" -p production -h "172.17.212.193"
 
-APP_NAME=""   # 应用名称，如 project-web-next
+APP_NAME=""   # 应用名称，如 med-selection-web
 DEPLOY_ENV="" # 部署环境
 PM2_ENV=""    # pm2 ecosystem.config.js 中的环境名称
 RSYNC_HOST="" # 编译服务器 IP
@@ -48,8 +47,8 @@ if [[ -z "$APP_NAME" || -z "$PM2_ENV" || -z "$RSYNC_HOST" ]]; then
     exit 1
 fi
 
-# 编译制品 rsync src
-RSYNC_SRC="root@${RSYNC_HOST}::data/artifacts/frontend/${DEPLOY_ENV}${APP_NAME}/"
+# 编译制品 rsync src（Express.js 应用无须像 Next.js Standalone 手动处理 .next 等目录）
+RSYNC_SRC="root@${RSYNC_HOST}::data/git_repos/frontend/${DEPLOY_ENV}${APP_NAME}/"
 # 应用部署目录 rsync dest
 APP_DIR="/data/www/nodejs/${APP_NAME}/"
 # 脚本所在目录
@@ -71,10 +70,15 @@ echo "Starting application deployment..."
 
 echo "Starting to sync application artifact..."
 # TODO: backup working version
-if ! rsync -a --delete $RSYNC_SRC $APP_DIR; then
+if ! rsync -a --delete --exclude=app_assets/ --exclude=log/ --exclude=.git/ $RSYNC_SRC $APP_DIR; then
     log_error "Failed to sync application artifact"
     exit 1
 fi
+
+mkdir -p ${APP_DIR}log || {
+    log_error "Failed to create log directory"
+    exit 1
+}
 
 echo "Changing directory to $APP_DIR..."
 cd "$APP_DIR" || {
