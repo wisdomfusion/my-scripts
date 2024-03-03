@@ -57,6 +57,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # 脚本执行日志
 LOG_FILE="${SCRIPT_DIR}/build_logs"
 
+log_error() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [ERROR] ${DEPLOY_ENV}${APP_NAME} $1" >>"$LOG_FILE"
+    echo "[ERROR] $1"
+}
+
+log_info() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [INFO] ${DEPLOY_ENV}${APP_NAME} $1" >>"$LOG_FILE"
+    echo "[INFO] $1"
+}
+
 echo "Starting build process for $APP_NAME..."
 
 echo "Changing directory to $APP_SRC_DIR..."

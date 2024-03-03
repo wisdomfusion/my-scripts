@@ -49,7 +49,7 @@ fi
 # 编译制品 rsync src
 RSYNC_SRC="root@${RSYNC_HOST}::data/git_repos/frontend/${DEPLOY_ENV}${APP_NAME}/build/"
 # 应用部署目录 rsync dest
-APP_DIR="/data/www/${APP_DOMAIN}/"
+APP_DIR="/data/www/static/${APP_DOMAIN}/"
 # 脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # 脚本执行日志
