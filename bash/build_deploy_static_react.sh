@@ -76,7 +76,7 @@ cd "$APP_SRC_DIR" || {
 }
 
 echo "Pulling code from git repository..."
-git checkout . && git pull && git checkout $GIT_BRANCH || {
+git clean -f && git pull && git checkout $GIT_BRANCH || {
     log_error "Failed to pull code from git repository"
     exit 1
 }
