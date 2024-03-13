@@ -5,6 +5,17 @@
 # chkconfig: - 84 16
 # description: spring boot project
 
+# 约定：
+# 1. 应用名称：battleship-project-service
+# 2. 制品名称："${APP_NAME}-1.0-SNAPSHOT.jar"
+# 3. 常用目录或路径：
+#
+# 脚本参数：
+# -n 应用名称
+# -e 发布环境： prod 生产环境，stage 预发环境
+# -h Nacos 部署 host:port
+# eg. /data/artifacts/spring_boot_pm.sh -n "battleship-activity-service" -e stage -h "127.0.0.1:8848" start
+
 # 处理命名参数
 while getopts ":n:e:h:" opt; do
     case ${opt} in
@@ -30,7 +41,7 @@ if [[ -z "$APP_NAME" ]]; then
 fi
 
 APP_DIR="/data/artifacts/${APP_NAME}"
-APP_JAR="battleship-${APP_NAME}-1.0-SNAPSHOT.jar"
+APP_JAR="${APP_NAME}-1.0-SNAPSHOT.jar"
 APP_CONF="--spring.profiles.active=${DEPLOY_ENV} --spring.cloud.nacos.discovery.server-addr=${NACOS_HOST} --spring.cloud.nacos.config.server-addr=${NACOS_HOST}"
 
 cd $APP_DIR

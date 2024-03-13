@@ -13,7 +13,7 @@
 # -n 应用名称
 # -d 应用程序域名
 # -e 可选，部署环境：prod 生产环境（默认，空），stage 预发环境，预发环境的路径中添加 `stage_`
-# -h, --rsync-host 编译服务器 IP，开启 rsyncd
+# -h 编译服务器 IP，开启 rsyncd
 # eg. ./deploy_static_react.sh -n "boss-web" -d "console.cn-healthcare.com" -h "172.17.212.193"
 
 APP_NAME=""   # 应用名称，如 boss-web

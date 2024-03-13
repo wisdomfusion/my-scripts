@@ -14,7 +14,7 @@
 # -n 应用名称
 # -e 可选，部署环境：prod 生产环境（默认，空），stage 预发环境，预发环境的路径中添加 `stage_`
 # -p pm2 ecosystem.config.js 中的环境名称，可指定 production, staging, development
-# -h, --rsync-host 编译服务器 IP，开启 rsyncd
+# -h 编译服务器 IP，开启 rsyncd
 # eg. ./deploy_express.sh -n "med-selection-web" -p production -h "172.17.212.193"
 
 APP_NAME=""   # 应用名称，如 med-selection-web
