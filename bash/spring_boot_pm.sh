@@ -16,6 +16,9 @@
 # -h Nacos 部署 host:port
 # eg. /data/artifacts/spring_boot_pm.sh -n "battleship-activity-service" -e stage -h "127.0.0.1:8848" start
 
+export JAVA_HOME=/opt/jdk1.8.0_401
+export PATH=$JAVA_HOME/bin:$PATH
+
 # 处理命名参数
 while getopts ":n:e:h:" opt; do
     case ${opt} in
@@ -43,6 +46,17 @@ fi
 APP_DIR="/data/artifacts/${APP_NAME}"
 APP_JAR="${APP_NAME}-1.0-SNAPSHOT.jar"
 APP_CONF="--spring.profiles.active=${DEPLOY_ENV} --spring.cloud.nacos.discovery.server-addr=${NACOS_HOST} --spring.cloud.nacos.config.server-addr=${NACOS_HOST}"
+LOG_FILE="${APP_DIR}/deploy_logs"
+
+log_error() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [ERROR] ${APP_NAME} $1" >>"$LOG_FILE"
+    echo "[ERROR] ${APP_NAME} $1"
+}
+
+log_info() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] [INFO] ${APP_NAME} $1" >>"$LOG_FILE"
+    echo "[INFO] ${APP_NAME} $1"
+}
 
 cd $APP_DIR
 
@@ -61,10 +75,10 @@ start() {
     started
 
     if [ $? -eq "0" ]; then
-        echo "${APP_NAME} is already running, pid ${PID}"
+        log_info "already running, pid ${PID}"
     else
-        nohup java -Xmx512m -Xms512m -jar ${APP_JAR} ${APP_CONF} > /dev/null 2>&1 &
-        echo "${APP_NAME} started successfully"
+        nohup java -Xmx512m -Xms512m -jar ${APP_JAR} ${APP_CONF} > logs/start.log 2>&1 &
+        log_info "started successfully"
     fi
 }
 
@@ -73,8 +87,9 @@ stop() {
 
     if [ $? -eq "0" ]; then
         kill -9 $PID
+        log_info "stopped successfully"
     else
-        echo "${APP_NAME} is NOT running"
+        log_info "NOT running"
     fi
 }
 
@@ -82,9 +97,9 @@ status() {
     started
 
     if [ $? -eq "0" ]; then
-        echo "${APP_NAME} is running, pid is ${PID}"
+        log_info "already running, pid ${PID}"
     else
-        echo "${APP_NAME} is NOT running"
+        log_info "NOT running"
     fi
 }
 
