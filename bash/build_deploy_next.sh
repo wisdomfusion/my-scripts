@@ -17,7 +17,7 @@
 # -r 应用程序 package.json 中定义的 npm run 执行脚本名称
 # -e 可选，部署环境：prod 生产环境（默认，空），stage 预发环境，预发环境的路径中添加 `stage_`
 # -h 可选，部署主机列表
-# eg. ./build_deploy_next.sh -n "project-web-next" -b main -r build -h "172.17.212.190"
+# eg. ./build_deploy_next.sh -n "project-web-next" -b main -r build -e prod -h "172.17.212.190"
 
 APP_NAME=""    # Next.js 应用名称，如 project-web-next
 GIT_BRANCH=""  # git 分支名称，生产环境 main，预发环境 stage
@@ -51,14 +51,22 @@ if [[ -z "$APP_NAME" || -z "$GIT_BRANCH" || -z "$NPM_RUN" ]]; then
     exit 1
 fi
 
+if [ "$DEPLOY_ENV" = "prod" ]; then
+    DEPLOY_ENV=""
+elif [ "$DEPLOY_ENV" = "stage" ]; then
+    DEPLOY_ENV="stage_"
+else
+    DEPLOY_ENV=""
+fi
+
 # 应用代码目录
-APP_SRC_DIR="/data/git_repos/frontend/${DEPLOY_ENV}${APP_NAME}/"
+APP_SRC_DIR="/data/git_repos/${DEPLOY_ENV}frontend/${APP_NAME}/"
 # 编译后生成的制品
-ARTIFACT_DIR="/data/artifacts/frontend/${DEPLOY_ENV}${APP_NAME}/"
+ARTIFACT_DIR="/data/artifacts/${DEPLOY_ENV}frontend/${APP_NAME}/"
 # 远程部署主机部署脚本路径
-DEPLOY_SCRIPT="/data/deploy_scripts/auto_deploy_${DEPLOY_ENV}${APP_NAME}.sh"
+DEPLOY_SCRIPT="/data/deploy_scripts/auto_deploy_${APP_NAME}.sh"
 # 应用配置 .env
-ENV_DIR="/data/app_env"
+ENV_DIR="/data/app_env/${DEPLOY_ENV}frontend"
 # 脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # 脚本执行日志
@@ -83,12 +91,12 @@ cd "$APP_SRC_DIR" || {
 }
 
 echo "Pulling code from git repository..."
-git clean -f && git pull && git checkout $GIT_BRANCH || {
+git reset --hard && git clean -f && git pull && git checkout $GIT_BRANCH || {
     log_error "Failed to pull code from git repository"
     exit 1
 }
 
-cp -u "$ENV_DIR/${DEPLOY_ENV}${APP_NAME}_env" "${APP_SRC_DIR}.env" || {
+cp -u "$ENV_DIR/${APP_NAME}_env" "${APP_SRC_DIR}.env" || {
     log_error "Failed to copy environment file"
     exit 1
 }
