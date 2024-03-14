@@ -43,8 +43,9 @@ if [[ -z "$APP_NAME" ]]; then
     exit 1
 fi
 
-APP_DIR="/data/artifacts/${APP_NAME}"
-APP_JAR="${APP_NAME}-1.0-SNAPSHOT.jar"
+APP_DIR=/data/artifacts/$APP_NAME
+cd $APP_DIR
+APP_JAR=${APP_NAME}-*.jar
 APP_CONF="--spring.profiles.active=${DEPLOY_ENV} --spring.cloud.nacos.discovery.server-addr=${NACOS_HOST} --spring.cloud.nacos.config.server-addr=${NACOS_HOST}"
 LOG_FILE="${APP_DIR}/deploy_logs"
 
@@ -57,8 +58,6 @@ log_info() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] [INFO] ${APP_NAME} $1" >>"$LOG_FILE"
     echo "[INFO] ${APP_NAME} $1"
 }
-
-cd $APP_DIR
 
 started() {
     PID=$(ps -ef | grep "${APP_JAR}" | grep -v grep | awk '{print $2}')
