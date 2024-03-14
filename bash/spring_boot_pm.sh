@@ -60,7 +60,7 @@ log_info() {
 }
 
 started() {
-    PID=$(ps -ef | grep "${APP_JAR}" | grep -v grep | awk '{print $2}')
+    PID=$(ps -ef | grep $APP_JAR | grep -v grep | awk '{print $2}')
 
     if [ -z "${PID}" ]; then
         return 1
