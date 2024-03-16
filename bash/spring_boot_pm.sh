@@ -14,17 +14,22 @@
 # -n 应用名称
 # -e 发布环境： prod 生产环境，stage 预发环境
 # -h Nacos 部署 host:port
+# -j JAVA_OPTS，如 "-Xmx1g -Xms1g" 或 "-Xmx512m -Xms512m"
 # eg. /data/artifacts/spring_boot_pm.sh -n "battleship-activity-service" -e stage -h "127.0.0.1:8848" start
+#     /data/artifacts/spring_boot_pm.sh -n "battleship-activity-service" -e stage -h "127.0.0.1:8848" -j "-Xmx1g -Xms1g" start
 
 export JAVA_HOME=/opt/jdk1.8.0_401
 export PATH=$JAVA_HOME/bin:$PATH
 
+DEFAULT_JAVA_OPTS="-Xmx512m -Xms512m"
+
 # 处理命名参数
-while getopts ":n:e:h:" opt; do
+while getopts ":n:e:h:j:" opt; do
     case ${opt} in
     n) APP_NAME="$OPTARG" ;;
     e) DEPLOY_ENV="$OPTARG" ;;
     h) NACOS_HOST="$OPTARG" ;;
+    j) JAVA_OPTS="$OPTARG" ;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
         exit 1
@@ -38,9 +43,13 @@ done
 shift $((OPTIND - 1))
 
 # 检查必选参数是否为空
-if [[ -z "$APP_NAME" ]]; then
-    echo "Usage: $0 -n <APP_NAME> -e <DEPLOY_ENV> -h <NACOS_HOST> [start|stop|restart|status]" >&2
+if [[ -z "$APP_NAME" || -z "$DEPLOY_ENV" || -z "$NACOS_HOST" ]]; then
+    echo "Usage: $0 -n <APP_NAME> -e <DEPLOY_ENV> -h <NACOS_HOST> -j <JAVA_OPTS> [start|stop|restart|status]" >&2
     exit 1
+fi
+
+if [[ -z "$JAVA_OPTS" ]]; then
+    JAVA_OPTS=$DEFAULT_JAVA_OPTS
 fi
 
 APP_DIR=/data/artifacts/$APP_NAME
@@ -76,7 +85,7 @@ start() {
     if [ $? -eq "0" ]; then
         log_info "already running, pid ${PID}"
     else
-        nohup java -Xmx512m -Xms512m -jar ${APP_JAR} ${APP_CONF} > logs/start.log 2>&1 &
+        nohup java ${JAVA_OPTS} -jar ${APP_JAR} ${APP_CONF} > logs/start.log 2>&1 &
         log_info "started successfully"
     fi
 }
