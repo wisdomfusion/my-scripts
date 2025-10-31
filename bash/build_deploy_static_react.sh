@@ -104,6 +104,44 @@ fi
 log_info "Artifact prepared successfully"
 log_info "****** Building tasks completed successfully ******"
 
+echo "Generating version.json..."
+
+BUILD_OUTPUT_DIR="${APP_SRC_DIR}build"
+
+if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+    APP_VERSION=$(git rev-parse --short HEAD 2>/dev/null || echo "")
+    if [[ -z "$APP_VERSION" ]]; then
+        APP_VERSION=$(date +%s)
+        log_info "Git commit hash not available, using timestamp as version: ${APP_VERSION}"
+    else
+        log_info "Using Git commit hash as version: ${APP_VERSION}"
+    fi
+else
+    APP_VERSION=$(date +%s)
+    log_info "Git not available, using timestamp as version: ${APP_VERSION}"
+fi
+
+BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+if [[ -d "$BUILD_OUTPUT_DIR" ]]; then
+    cat > "${BUILD_OUTPUT_DIR}/version.json" <<EOF
+{
+  "version": "${APP_VERSION}",
+  "buildTime": "${BUILD_TIME}"
+}
+EOF
+    if [[ $? -eq 0 ]]; then
+        log_info "version.json generated successfully in ${BUILD_OUTPUT_DIR}/version.json"
+        log_info "Version: ${APP_VERSION}, BuildTime: ${BUILD_TIME}"
+    else
+        log_error "Failed to generate version.json"
+        exit 1
+    fi
+else
+    log_error "Build output directory not found: ${BUILD_OUTPUT_DIR}"
+    exit 1
+fi
+
 if [[ -z "$DEPLOY_HOST" ]]; then
     exit 0
 fi
