@@ -104,10 +104,12 @@ fi
 log_info "Artifact prepared successfully"
 log_info "****** Building tasks completed successfully ******"
 
+# 构建成功后，生成 version.json 文件
 echo "Generating version.json..."
 
 BUILD_OUTPUT_DIR="${APP_SRC_DIR}build"
 
+# 获取版本信息（优先使用 Git commit hash，如果不可用则使用构建时间戳）
 if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
     APP_VERSION=$(git rev-parse --short HEAD 2>/dev/null || echo "")
     if [[ -z "$APP_VERSION" ]]; then
@@ -121,8 +123,10 @@ else
     log_info "Git not available, using timestamp as version: ${APP_VERSION}"
 fi
 
+# 构建时间（UTC 格式）
 BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+# 生成 version.json 文件
 if [[ -d "$BUILD_OUTPUT_DIR" ]]; then
     cat > "${BUILD_OUTPUT_DIR}/version.json" <<EOF
 {
